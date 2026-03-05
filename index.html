@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini 4 Pro — Flight Planner</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha256-tXCrvaljxgtN5LT/Syb5Mm9T+yzPFGH98JVcoJT7JTk=" crossorigin="anonymous"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha256-XJrs/DDkVkUZ29zdzFOkGCJ9zHVo5hnpdi3c7HYJ7Uc=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=" crossorigin="anonymous"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#111318;--panel:#1a1d24;--border:#2a2d36;--text:#e2e4e9;--dim:#7a7f8d;
+  --accent:#4d9fff;--green:#3ddc84;--orange:#ffab40;--red:#ff5252;
+  --radius:10px;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--border);z-index:1000;flex-shrink:0}
+.toolbar .logo{font-weight:700;font-size:15px;letter-spacing:-0.3px;white-space:nowrap}
+.toolbar .logo span{color:var(--accent);font-family:'DM Mono',monospace;font-weight:500;font-size:12px;margin-left:6px;opacity:0.7}
+.toolbar .sep{width:1px;height:24px;background:var(--border)}
+.tool-btn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;font-weight:500}
+.tool-btn:hover{background:rgba(77,159,255,0.08);color:var(--text);border-color:var(--accent)}
+.tool-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tool-btn svg{width:16px;height:16px}
+.tool-btn.green.active{background:var(--green);color:#111}
+.spacer{flex:1}
+
+/* MAIN LAYOUT */
+.main{flex:1;display:flex;overflow:hidden;position:relative}
+#map{flex:1;z-index:1;touch-action:none}
+
+/* SIDE PANEL */
+.side{width:320px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;z-index:2;flex-shrink:0}
+.side::-webkit-scrollbar{width:5px}
+.side::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.section{padding:16px;border-bottom:1px solid var(--border)}
+.section-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);margin-bottom:12px}
+.section-title.blue{color:var(--accent)}
+.section-title.green{color:var(--green)}
+.section-title.orange{color:var(--orange)}
+
+/* FORM */
+.field{margin-bottom:10px}
+.field label{display:block;font-size:11px;color:var(--dim);margin-bottom:3px;font-weight:500}
+.field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:'DM Mono',monospace;outline:none;transition:border-color 0.15s}
+.field input:focus{border-color:var(--accent)}
+.row{display:flex;gap:8px}
+.row .field{flex:1}
+
+/* SLIDER */
+.slider-field{margin-bottom:10px}
+.slider-field .slider-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.slider-field .slider-head label{font-size:11px;color:var(--dim);font-weight:500}
+.slider-field .slider-head span{font-size:14px;font-weight:700;font-family:'DM Mono',monospace;color:var(--text)}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;background:var(--border);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--panel)}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.stat-card .stat-label{font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--dim);font-weight:500}
+.stat-card .stat-val{font-size:20px;font-weight:700;font-family:'DM Mono',monospace;margin-top:1px}
+.stat-card .stat-val .u{font-size:10px;font-weight:400;color:var(--dim);margin-left:2px}
+.warn{background:rgba(255,82,82,0.08);border:1px solid rgba(255,82,82,0.2);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--red);margin-top:6px}
+
+/* EXPORT BUTTONS */
+.export-row{display:flex;gap:6px;flex-wrap:wrap}
+.export-btn{padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:600;transition:all 0.15s}
+.export-btn:hover{border-color:var(--accent);color:var(--accent)}
+.export-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.export-btn.primary:hover{background:#3d8fee}
+
+/* MAP OVERLAY CONTROLS */
+.map-overlay{position:absolute;top:10px;right:340px;z-index:500;display:flex;gap:6px}
+.map-chip{padding:5px 12px;border-radius:20px;background:rgba(26,29,36,0.9);border:1px solid var(--border);color:var(--dim);font-size:11px;font-family:'DM Mono',monospace;backdrop-filter:blur(8px)}
+.map-chip strong{color:var(--text)}
+
+/* ANGLE HANDLE TOOLTIP */
+.angle-tooltip{background:rgba(26,29,36,0.95);color:var(--text);border:1px solid var(--accent);border-radius:6px;padding:4px 10px;font-size:12px;font-family:'DM Mono',monospace;font-weight:600;white-space:nowrap}
+
+
+/* ROTATION HANDLE */
+.rotation-handle{width:24px;height:24px;background:var(--accent);border:2px solid #fff;border-radius:50%;cursor:grab;box-shadow:0 2px 8px rgba(0,0,0,0.4);z-index:600}
+.rotation-handle:active{cursor:grabbing}
+.rotation-line{stroke:var(--accent);stroke-width:2;stroke-dasharray:6 4}
+
+/* SEARCH BAR */
+.search-wrap{position:absolute;top:12px;left:12px;z-index:500;display:flex;gap:6px;align-items:center;pointer-events:none}
+.search-wrap input,.search-wrap .search-results{pointer-events:auto}
+.search-wrap input{width:280px;background:rgba(26,29,36,0.92);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px 9px 34px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;backdrop-filter:blur(12px);transition:border-color 0.15s}
+.search-wrap input:focus{border-color:var(--accent)}
+.search-wrap input::placeholder{color:var(--dim)}
+.search-icon{position:absolute;left:22px;top:50%;transform:translateY(-50%);color:var(--dim);pointer-events:none}
+.search-results{position:absolute;top:100%;left:0;width:280px;margin-top:4px;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-height:240px;overflow-y:auto}
+.search-results:empty{display:none}
+.search-result{padding:10px 12px;font-size:12px;color:var(--dim);cursor:pointer;border-bottom:1px solid var(--border);transition:background 0.1s}
+.search-result:last-child{border-bottom:none}
+.search-result:hover{background:rgba(77,159,255,0.08);color:var(--text)}
+.search-result strong{color:var(--text);font-weight:500}
+
+/* MAP FLOAT BUTTONS */
+.map-float-btn{width:36px;height:36px;border-radius:8px;background:rgba(26,29,36,0.92);border:1px solid var(--border);color:var(--dim);display:flex;align-items:center;justify-content:center;cursor:pointer;backdrop-filter:blur(12px);transition:all 0.15s}
+.map-float-btn:hover{border-color:var(--accent);color:var(--text)}
+.map-float-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.map-float-btn svg{width:18px;height:18px}
+.map-btns-right{position:absolute;top:12px;right:340px;z-index:500;display:flex;gap:6px;pointer-events:none}
+.map-btns-right>*{pointer-events:auto}
+.map-btns-left{position:absolute;bottom:30px;left:12px;z-index:500;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.map-btns-left>*{pointer-events:auto}
+
+/* COORD DISPLAY */
+.coord-bar{position:absolute;bottom:4px;left:12px;z-index:500;font-size:10px;font-family:'DM Mono',monospace;color:var(--dim);background:rgba(26,29,36,0.8);padding:3px 8px;border-radius:4px;pointer-events:none}
+
+/* LEAFLET OVERRIDES */
+.leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--border)!important}
+.leaflet-popup-content-wrapper{background:var(--panel);color:var(--text);border-radius:8px;font-family:'DM Sans',sans-serif}
+.leaflet-popup-tip{background:var(--panel)}
+</style>
+</head>
+<body>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="logo">Mini 4 Pro<span>Flight Planner</span></div>
+  <div class="sep"></div>
+  <button class="tool-btn green" id="drawBtn" onclick="startDraw()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+    Draw Area
+  </button>
+  <button class="tool-btn" id="uploadBtn" onclick="document.getElementById('fileIn').click()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Upload KML
+  </button>
+  <input type="file" id="fileIn" accept=".kml,.kmz" style="display:none">
+  <button class="tool-btn" id="clearBtn" onclick="clearAll()" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    Clear
+  </button>
+  <div class="spacer"></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div id="map"></div>
+
+  <!-- SEARCH -->
+  <div class="search-wrap">
+    <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" id="searchInput" placeholder="Search address or place..." autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <!-- MAP BUTTONS (right side) -->
+  <div class="map-btns-right">
+    <div class="map-chip" id="areaChip" style="display:none">Area: <strong id="areaVal">--</strong></div>
+    <button class="map-float-btn" id="layerToggle" title="Toggle map style" onclick="toggleMapLayer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+    </button>
+  </div>
+
+  <!-- MAP BUTTONS (left bottom) -->
+  <div class="map-btns-left">
+    <button class="map-float-btn" title="My location (L)" onclick="goToMyLocation()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="8"/></svg>
+    </button>
+    <button class="map-float-btn" title="Zoom in (+)" onclick="map.zoomIn()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="map-float-btn" title="Zoom out (-)" onclick="map.zoomOut()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="map-float-btn" title="Fit to area (F)" onclick="fitToArea()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </button>
+  </div>
+
+  <!-- COORDINATE DISPLAY -->
+  <div class="coord-bar" id="coordBar">--</div>
+
+
+  <!-- SIDE PANEL -->
+  <div class="side">
+    <!-- MISSION MODE -->
+    <div class="section" style="padding-bottom:10px">
+      <div class="section-title blue">Mission Mode</div>
+      <div style="display:flex;gap:4px">
+        <button class="tool-btn active" id="modeOrtho" onclick="setMode('ortho')" style="flex:1;justify-content:center">Ortho</button>
+        <button class="tool-btn" id="modeOrbit" onclick="setMode('orbit')" style="flex:1;justify-content:center">Orbit</button>
+        <button class="tool-btn" id="modePerim" onclick="setMode('perim')" style="flex:1;justify-content:center">Perimeter</button>
+      </div>
+    </div>
+
+    <!-- ORTHO PARAMS -->
+    <div class="section" id="orthoParams">
+      <div class="section-title blue">Flight Parameters</div>
+      <div class="row">
+        <div class="field"><label>Altitude (ft AGL)</label><input type="number" id="altitude" value="200" min="30" max="400" step="10"></div>
+        <div class="field"><label>Speed (m/s)</label><input type="number" id="speed" value="5" min="1" max="12" step="0.5"></div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-head"><label>Front Overlap</label><span id="fOV">80%</span></div>
+        <input type="range" id="frontOL" min="50" max="90" value="80">
+      </div>
+      <div class="slider-field">
+        <div class="slider-head"><label>Side Overlap</label><span id="sOV">75%</span></div>
+        <input type="range" id="sideOL" min="50" max="90" value="75">
+      </div>
+      <div class="row">
+        <div class="field"><label>Photo Mode</label>
+          <select id="photoMode"><option value="12" selected>12 MP (recommended)</option><option value="48">48 MP</option></select>
+        </div>
+        <div class="field"><label>Target GSD (in/px)</label>
+          <input type="number" id="targetGSD" value="1.0" min="0.1" max="10" step="0.1">
+        </div>
+      </div>
+      <div id="gsdAdvisory" style="display:none;margin-top:6px;padding:8px 10px;border-radius:6px;font-size:11px;font-family:'DM Mono',monospace;line-height:1.6"></div>
+      <div style="font-size:10px;color:var(--dim);margin-top:4px">Grid angle: drag the <span style="color:var(--accent)">blue handle</span> on the map to rotate flight lines</div>
+    </div>
+
+    <!-- ORBIT PARAMS -->
+    <div class="section" id="orbitParams" style="display:none">
+      <div class="section-title blue">Orbit Parameters</div>
+      <div class="row">
+        <div class="field"><label>Altitude (ft AGL)</label><input type="number" id="orbitAlt" value="150" min="30" max="400" step="10"></div>
+        <div class="field"><label>Speed (m/s)</label><input type="number" id="orbitSpeed" value="3" min="1" max="8" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Radius (ft)</label><input type="number" id="orbitRadius" value="150" min="30" max="1000" step="10"></div>
+        <div class="field"><label>Photos per loop</label><input type="number" id="orbitStops" value="24" min="8" max="72" step="4"></div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-head"><label>Gimbal Pitch</label><span id="orbitGimbalVal">-45°</span></div>
+        <input type="range" id="orbitGimbal" min="-90" max="-15" value="-45">
+      </div>
+      <div class="field"><label>Passes (altitudes)</label>
+        <select id="orbitPasses"><option value="1">1 pass</option><option value="2" selected>2 passes (high + low)</option><option value="3">3 passes</option></select>
+      </div>
+      <div style="font-size:10px;color:var(--dim);margin-top:6px">Click the map to place the <span style="color:var(--accent)">orbit center</span>. Camera always faces inward.</div>
+    </div>
+
+    <!-- PERIMETER PARAMS -->
+    <div class="section" id="perimParams" style="display:none">
+      <div class="section-title blue">Perimeter Parameters</div>
+      <div class="row">
+        <div class="field"><label>Altitude (ft AGL)</label><input type="number" id="perimAlt" value="120" min="30" max="400" step="10"></div>
+        <div class="field"><label>Speed (m/s)</label><input type="number" id="perimSpeed" value="3" min="1" max="8" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Offset (ft)</label><input type="number" id="perimOffset" value="50" min="10" max="300" step="10"></div>
+        <div class="field"><label>Photo spacing (ft)</label><input type="number" id="perimSpacing" value="20" min="5" max="100" step="5"></div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-head"><label>Gimbal Pitch</label><span id="perimGimbalVal">-45°</span></div>
+        <input type="range" id="perimGimbal" min="-90" max="-15" value="-45">
+      </div>
+      <div class="field"><label>Direction</label>
+        <select id="perimDir"><option value="outward" selected>Look inward (fly outside)</option><option value="inward">Look outward (fly inside)</option></select>
+      </div>
+      <div style="font-size:10px;color:var(--dim);margin-top:6px">Draw a polygon around the site. Drone flies offset from the edges, camera aimed inward.</div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="section" id="resultsSection" style="display:none">
+      <div class="section-title green">Flight Plan</div>
+      <div class="stats" id="statsGrid"></div>
+      <div id="warnBox"></div>
+      <div class="export-row" style="margin-top:12px">
+        <button class="export-btn primary" onclick="exportDJIKMZ()">DJI Fly KMZ</button>
+        <button class="export-btn" onclick="exportCSV()">CSV</button>
+        <button class="export-btn" onclick="exportKML()">KML</button>
+      </div>
+    </div>
+
+    <!-- WORKFLOW -->
+    <div class="section">
+      <div class="section-title orange">iPhone + RC-N2 Workflow</div>
+      <div style="font-size:11px;color:var(--dim);line-height:1.7">
+        <p style="margin-bottom:5px"><strong style="color:var(--text)">1.</strong> Draw area or upload KML. Adjust settings. Grid auto-generates.</p>
+        <p style="margin-bottom:5px"><strong style="color:var(--text)">2.</strong> Click <strong style="color:var(--accent)">DJI Fly KMZ</strong> to download mission file.</p>
+        <p style="margin-bottom:5px"><strong style="color:var(--text)">3.</strong> On iPhone: DJI Fly → Waypoints → save 2 dummy points → exit.</p>
+        <p style="margin-bottom:5px"><strong style="color:var(--text)">4.</strong> Files app → On My iPhone → DJI Fly → wayline_mission → replace newest .kmz with yours (rename to match).</p>
+        <p style="margin-bottom:5px"><strong style="color:var(--text)">5.</strong> Reopen DJI Fly → Waypoints → open mission → fly.</p>
+        <p style="margin-bottom:5px"><strong style="color:var(--text)">6.</strong> Camera: 12MP, Hyperlapse Free 2s interval, gimbal -90°, manual exposure, WB locked.</p>
+        <p style="color:var(--red);margin-top:6px;font-size:10px">Display may show curved lines — drone flies straight. This is normal.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CAMERA SPECS =====
+const CAM = {
+  12: { sw: 9.65, sh: 7.24, f: 6.72, iw: 4032, ih: 3024 },
+  48: { sw: 9.65, sh: 7.24, f: 6.72, iw: 8064, ih: 6048 },
+};
+
+// ===== STATE =====
+let map, satLayer, streetLayer, labelLayer, gridLayer, wpLayer, polyLayer, handleLayer;
+let isSatellite = true;
+let searchTimer = null;
+let locationMarker = null;
+let missionMode = 'ortho'; // 'ortho' | 'orbit' | 'perim'
+let orbitCenter = null; // {lat,lng}
+let orbitCenterMarker = null;
+let orbitRadiusCircle = null;
+let siteCoords = []; // [{lat,lng}]
+let drawMode = false;
+let drawPts = [];
+let drawTempMarkers = [];
+let drawTempLine = null;
+let gridAngle = 90; // degrees
+let flightPlan = null;
+let polyMarkers = []; // draggable vertex markers
+let rotHandle = null;
+let rotLine = null;
+let autoGenTimer = null;
+
+// ===== MAP INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+  map = L.map('map', {
+    center: [33.8678, -118.3568],
+    zoom: 17,
+    zoomControl: false,
+    doubleClickZoom: false,
+    dragging: true,
+    scrollWheelZoom: true,
+    touchZoom: true,
+  });
+
+  // Satellite imagery
+  satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Esri Satellite',
+    maxZoom: 20,
+  }).addTo(map);
+
+  // Street map (hidden by default)
+  streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20,
+  });
+
+  // Semi-transparent labels on top
+  labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20, opacity: 0.7
+  }).addTo(map);
+
+  // Coordinate display on mouse move (throttled)
+  let coordThrottle = 0;
+  map.on('mousemove', (e) => {
+    const now = Date.now();
+    if (now - coordThrottle < 50) return;
+    coordThrottle = now;
+    document.getElementById('coordBar').textContent =
+      e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6) + '  z' + map.getZoom();
+  });
+
+  polyLayer = L.layerGroup().addTo(map);
+  gridLayer = L.layerGroup().addTo(map);
+  wpLayer = L.layerGroup().addTo(map);
+  handleLayer = L.layerGroup().addTo(map);
+
+  map.on('click', onMapClick);
+  map.on('dblclick', onMapDblClick);
+
+  // Settings auto-regenerate
+  ['altitude','speed','photoMode','targetGSD'].forEach(id => {
+    document.getElementById(id).addEventListener('change', () => { updateGsdStandalone(); debounceRegen(); });
+    document.getElementById(id).addEventListener('input', updateGsdStandalone);
+  });
+  ['frontOL','sideOL'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      document.getElementById(id === 'frontOL' ? 'fOV' : 'sOV').textContent = el.value + '%';
+      debounceRegen();
+    });
+  });
+
+  // Orbit/Perim param listeners
+  ['orbitAlt','orbitSpeed','orbitRadius','orbitStops','orbitPasses'].forEach(id => {
+    document.getElementById(id).addEventListener('change', debounceRegen);
+  });
+  document.getElementById('orbitGimbal').addEventListener('input', (e) => {
+    document.getElementById('orbitGimbalVal').textContent = e.target.value + '°';
+    debounceRegen();
+  });
+  ['perimAlt','perimSpeed','perimOffset','perimSpacing','perimDir'].forEach(id => {
+    document.getElementById(id).addEventListener('change', debounceRegen);
+  });
+  document.getElementById('perimGimbal').addEventListener('input', (e) => {
+    document.getElementById('perimGimbalVal').textContent = e.target.value + '°';
+    debounceRegen();
+  });
+
+  // File upload
+  document.getElementById('fileIn').addEventListener('change', e => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+});
+
+function debounceRegen() {
+  clearTimeout(autoGenTimer);
+  autoGenTimer = setTimeout(() => {
+    if (missionMode === 'orbit' && orbitCenter) generateOrbitPlan();
+    else if (siteCoords.length >= 3) generatePlan();
+  }, 200);
+}
+
+function setMode(mode) {
+  missionMode = mode;
+  document.getElementById('modeOrtho').classList.toggle('active', mode === 'ortho');
+  document.getElementById('modeOrbit').classList.toggle('active', mode === 'orbit');
+  document.getElementById('modePerim').classList.toggle('active', mode === 'perim');
+  document.getElementById('orthoParams').style.display = mode === 'ortho' ? '' : 'none';
+  document.getElementById('orbitParams').style.display = mode === 'orbit' ? '' : 'none';
+  document.getElementById('perimParams').style.display = mode === 'perim' ? '' : 'none';
+  // Update draw button label
+  const drawBtn = document.getElementById('drawBtn');
+  if (mode === 'orbit' && !drawMode) {
+    drawBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg> Place Center';
+  } else if (!drawMode) {
+    drawBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg> Draw Area';
+  }
+  // Full clear — wipe everything from previous mode
+  if (drawMode) cancelDraw();
+  flightPlan = null;
+  siteCoords = [];
+  orbitCenter = null;
+  if (orbitCenterMarker) { map.removeLayer(orbitCenterMarker); orbitCenterMarker = null; }
+  if (orbitRadiusCircle) { map.removeLayer(orbitRadiusCircle); orbitRadiusCircle = null; }
+  polyLayer.clearLayers();
+  gridLayer.clearLayers();
+  wpLayer.clearLayers();
+  handleLayer.clearLayers();
+  polyMarkers.forEach(m => map.removeLayer(m)); polyMarkers = [];
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('areaChip').style.display = 'none';
+  // Auto-start draw for the new mode
+  startDraw();
+}
+
+// ===== DRAW MODE =====
+function startDraw() {
+  if (drawMode) { cancelDraw(); return; }
+  drawMode = true;
+  drawPts = [];
+  document.getElementById('drawBtn').classList.add('active');
+  document.getElementById('drawBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Cancel';
+  map.getContainer().style.cursor = 'crosshair';
+
+  if (missionMode === 'orbit') {
+    // Orbit just needs a single click — handled in onMapClick
+  }
+}
+function cancelDraw() {
+  drawMode = false;
+  document.getElementById('drawBtn').classList.remove('active');
+  document.getElementById('drawBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg> Draw Area';
+  map.getContainer().style.cursor = '';
+  drawTempMarkers.forEach(m => map.removeLayer(m)); drawTempMarkers = [];
+  if (drawTempLine) map.removeLayer(drawTempLine); drawTempLine = null;
+}
+
+function onMapClick(e) {
+  if (!drawMode) return;
+  // Orbit mode: single click to place center
+  if (missionMode === 'orbit') {
+    placeOrbitCenter(e.latlng);
+    cancelDraw();
+    return;
+  }
+  // Close polygon if clicking near first point
+  if (drawPts.length >= 3) {
+    const fp = map.latLngToContainerPoint(L.latLng(drawPts[0].lat, drawPts[0].lng));
+    const cp = map.latLngToContainerPoint(e.latlng);
+    if (fp.distanceTo(cp) < 18) { finishDraw(); return; }
+  }
+  drawPts.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+  const m = L.circleMarker(e.latlng, {
+    radius: drawPts.length === 1 ? 8 : 5,
+    color: drawPts.length === 1 ? '#3ddc84' : '#4d9fff',
+    fillColor: drawPts.length === 1 ? '#3ddc84' : '#4d9fff',
+    fillOpacity: 1, weight: 2, className: '',
+  }).addTo(map);
+  drawTempMarkers.push(m);
+  if (drawTempLine) map.removeLayer(drawTempLine);
+  if (drawPts.length > 1)
+    drawTempLine = L.polyline(drawPts.map(p => [p.lat, p.lng]), { color: '#4d9fff', weight: 2, dashArray: '8 5' }).addTo(map);
+}
+function onMapDblClick(e) {
+  if (!drawMode || drawPts.length < 3) return;
+  e.originalEvent.preventDefault();
+  finishDraw();
+}
+function finishDraw() {
+  drawMode = false;
+  map.getContainer().style.cursor = '';
+  document.getElementById('drawBtn').classList.remove('active');
+  document.getElementById('drawBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg> Draw Area';
+  drawTempMarkers.forEach(m => map.removeLayer(m)); drawTempMarkers = [];
+  if (drawTempLine) map.removeLayer(drawTempLine); drawTempLine = null;
+  setSitePolygon([...drawPts]);
+  drawPts = [];
+}
+
+// ===== FILE UPLOAD =====
+async function handleFile(file) {
+  const name = file.name.toLowerCase();
+  let kml;
+  try {
+    if (name.endsWith('.kmz')) {
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      const kf = Object.keys(zip.files).find(f => f.toLowerCase().endsWith('.kml'));
+      if (!kf) { alert('No KML inside KMZ'); return; }
+      kml = await zip.files[kf].async('text');
+    } else { kml = await file.text(); }
+  } catch (e) { alert('Error reading: ' + e.message); return; }
+  const coords = parseKML(kml);
+  if (!coords || coords.length < 3) { alert('No polygon found in file.\nUse Draw Area instead.'); return; }
+  setSitePolygon(coords);
+
+}
+
+function parseKML(t) {
+  const doc = new DOMParser().parseFromString(t, 'text/xml');
+  let ct = '';
+  // Try Polygon > LinearRing > coordinates
+  const polys = doc.getElementsByTagName('Polygon');
+  if (polys.length) { const r = polys[0].getElementsByTagName('coordinates'); if (r.length) ct = r[0].textContent; }
+  if (!ct) { const r = doc.getElementsByTagName('LinearRing'); if (r.length) { const c = r[0].getElementsByTagName('coordinates'); if (c.length) ct = c[0].textContent; } }
+  if (!ct) { const all = doc.getElementsByTagName('coordinates'); for (let i = 0; i < all.length; i++) { const pts = all[i].textContent.trim().split(/[\s\n\r]+/).filter(p => p.includes(',')); if (pts.length >= 3) { ct = all[i].textContent; break; } } }
+  if (!ct) { const m = t.match(/<coordinates[^>]*>([\s\S]*?)<\/coordinates>/i); if (m) ct = m[1]; }
+  if (!ct) return null;
+  const coords = [];
+  ct.trim().split(/[\s\n\r]+/).filter(p => p.includes(',') && p.length > 3).forEach(p => {
+    const [lng, lat] = p.split(',').map(Number);
+    if (!isNaN(lat) && !isNaN(lng)) coords.push({ lat, lng });
+  });
+  if (coords.length > 1) { const f = coords[0], l = coords[coords.length-1]; if (Math.abs(f.lat-l.lat)<1e-7 && Math.abs(f.lng-l.lng)<1e-7) coords.pop(); }
+  return coords.length >= 3 ? coords : null;
+}
+
+// ===== SET POLYGON =====
+function setSitePolygon(coords) {
+  siteCoords = coords;
+
+  document.getElementById('clearBtn').style.display = '';
+  drawPolygon();
+  createVertexHandles();
+  createRotationHandle();
+  generatePlan();
+  // Fit map
+  const bounds = L.latLngBounds(coords.map(c => [c.lat, c.lng]));
+  map.fitBounds(bounds.pad(0.3));
+  updateAreaChip();
+}
+
+function drawPolygon() {
+  polyLayer.clearLayers();
+  if (siteCoords.length < 3) return;
+  L.polygon(siteCoords.map(c => [c.lat, c.lng]), {
+    color: '#4d9fff', weight: 2, fillColor: '#4d9fff', fillOpacity: 0.08, dashArray: '0',
+  }).addTo(polyLayer);
+}
+
+function updateAreaChip() {
+  const a = polyArea(siteCoords);
+  document.getElementById('areaChip').style.display = '';
+  document.getElementById('areaVal').textContent = (a / 4046.86).toFixed(2) + ' ac';
+}
+
+// ===== DRAGGABLE VERTEX HANDLES =====
+function createVertexHandles() {
+  polyMarkers.forEach(m => map.removeLayer(m));
+  polyMarkers = [];
+  siteCoords.forEach((c, i) => {
+    // Use a real Leaflet marker with a larger icon for easy clicking
+    const icon = L.divIcon({
+      className: '',
+      html: '<div style="width:22px;height:22px;border-radius:50%;background:#4d9fff;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.5);cursor:grab"></div>',
+      iconSize: [22, 22], iconAnchor: [11, 11],
+    });
+    const m = L.marker([c.lat, c.lng], { icon, draggable: true, zIndexOffset: 800 }).addTo(map);
+    m.on('dragstart', () => { map.dragging.disable(); });
+    m.on('drag', (e) => {
+      const ll = e.target.getLatLng();
+      siteCoords[i] = { lat: ll.lat, lng: ll.lng };
+      drawPolygon();
+      updateAreaChip();
+      updateRotationHandle();
+      debounceRegen();
+    });
+    m.on('dragend', () => { map.dragging.enable(); });
+    polyMarkers.push(m);
+  });
+}
+
+
+// ===== ROTATION HANDLE =====
+function createRotationHandle() {
+  handleLayer.clearLayers();
+  if (siteCoords.length < 3) return;
+  const center = polyCenter(siteCoords);
+  const radius = getHandleRadius();
+  const angleRad = toRad(gridAngle - 90); // visual: 0° = north
+  const hLat = center.lat + (radius / 111320) * Math.cos(angleRad);
+  const hLng = center.lng + (radius / (111320 * Math.cos(toRad(center.lat)))) * Math.sin(angleRad);
+
+  // Line from center to handle
+  rotLine = L.polyline([[center.lat, center.lng], [hLat, hLng]], {
+    color: '#4d9fff', weight: 2, dashArray: '6 4', opacity: 0.6,
+  }).addTo(handleLayer);
+
+  // Handle marker
+  const icon = L.divIcon({ className: 'rotation-handle', iconSize: [24, 24], iconAnchor: [12, 12] });
+  rotHandle = L.marker([hLat, hLng], { icon, draggable: true, zIndexOffset: 1000 }).addTo(handleLayer);
+  rotHandle.bindTooltip(gridAngle + '°', { className: 'angle-tooltip', permanent: true, direction: 'top', offset: [0, -16] });
+
+  rotHandle.on('drag', (e) => {
+    const c = polyCenter(siteCoords);
+    const dx = (e.latlng.lng - c.lng) * Math.cos(toRad(c.lat));
+    const dy = e.latlng.lat - c.lat;
+    let ang = toDeg(Math.atan2(dx, dy)) + 90;
+    if (ang < 0) ang += 360;
+    if (ang >= 360) ang -= 360;
+    gridAngle = Math.round(ang);
+    rotHandle.setTooltipContent(gridAngle + '°');
+    updateRotationHandle();
+    debounceRegen();
+  });
+}
+
+function updateRotationHandle() {
+  if (!rotHandle || siteCoords.length < 3) return;
+  const center = polyCenter(siteCoords);
+  const radius = getHandleRadius();
+  const angleRad = toRad(gridAngle - 90);
+  const hLat = center.lat + (radius / 111320) * Math.cos(angleRad);
+  const hLng = center.lng + (radius / (111320 * Math.cos(toRad(center.lat)))) * Math.sin(angleRad);
+  rotHandle.setLatLng([hLat, hLng]);
+  rotLine.setLatLngs([[center.lat, center.lng], [hLat, hLng]]);
+}
+
+function getHandleRadius() {
+  // Distance from center to farthest vertex + 30m
+  const c = polyCenter(siteCoords);
+  let maxD = 0;
+  siteCoords.forEach(p => {
+    const d = Math.sqrt((p.lat - c.lat) ** 2 + ((p.lng - c.lng) * Math.cos(toRad(c.lat))) ** 2) * 111320;
+    if (d > maxD) maxD = d;
+  });
+  return maxD + 30;
+}
+
+function polyCenter(coords) {
+  let lat = 0, lng = 0;
+  coords.forEach(c => { lat += c.lat; lng += c.lng; });
+  return { lat: lat / coords.length, lng: lng / coords.length };
+}
+
+// ===== CLEAR =====
+function clearAll() {
+  siteCoords = [];
+  flightPlan = null;
+  orbitCenter = null;
+  if (orbitCenterMarker) { map.removeLayer(orbitCenterMarker); orbitCenterMarker = null; }
+  if (orbitRadiusCircle) { map.removeLayer(orbitRadiusCircle); orbitRadiusCircle = null; }
+  polyLayer.clearLayers();
+  gridLayer.clearLayers();
+  wpLayer.clearLayers();
+  handleLayer.clearLayers();
+  polyMarkers.forEach(m => map.removeLayer(m)); polyMarkers = [];
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('clearBtn').style.display = 'none';
+  document.getElementById('areaChip').style.display = 'none';
+}
+
+// ===== MATH =====
+function toRad(d) { return d * Math.PI / 180; }
+function toDeg(r) { return r * 180 / Math.PI; }
+function ll2m(ref, p) { const R = 6378137; return { x: toRad(p.lng - ref.lng) * R * Math.cos(toRad(ref.lat)), y: toRad(p.lat - ref.lat) * R }; }
+function m2ll(ref, x, y) { const R = 6378137; return { lat: ref.lat + toDeg(y / R), lng: ref.lng + toDeg(x / (R * Math.cos(toRad(ref.lat)))) }; }
+function polyArea(coords) {
+  if (coords.length < 3) return 0;
+  const ref = coords[0], pts = coords.map(c => ll2m(ref, c));
+  let a = 0; for (let i = 0; i < pts.length; i++) { const j = (i + 1) % pts.length; a += pts[i].x * pts[j].y - pts[j].x * pts[i].y; }
+  return Math.abs(a) / 2;
+}
+function pip(px, py, poly) {
+  let ins = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y, xj = poly[j].x, yj = poly[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) ins = !ins;
+  }
+  return ins;
+}
+
+// ===== FLIGHT PLAN GENERATION =====
+function generatePlan() {
+  if (missionMode === 'orbit') { if (orbitCenter) generateOrbitPlan(); return; }
+  if (missionMode === 'perim') { if (siteCoords.length >= 3) generatePerimPlan(); return; }
+  if (siteCoords.length < 3) return;
+  const alt_ft = +document.getElementById('altitude').value;
+  const speed = +document.getElementById('speed').value;
+  const fOL = +document.getElementById('frontOL').value;
+  const sOL = +document.getElementById('sideOL').value;
+  const cam = CAM[+document.getElementById('photoMode').value];
+  const alt_m = alt_ft * 0.3048;
+  const fpW = cam.sw * alt_m / cam.f;
+  const fpH = cam.sh * alt_m / cam.f;
+  const gsd = (cam.sw * alt_m * 100) / (cam.f * cam.iw);
+  const pSpc = fpH * (1 - fOL / 100);
+  const lSpc = fpW * (1 - sOL / 100);
+  const ref = siteCoords[0];
+  const polyM = siteCoords.map(c => ll2m(ref, c));
+  const buf = Math.max(fpW, fpH) / 2;
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  polyM.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const ang = toRad(gridAngle), cosA = Math.cos(ang), sinA = Math.sin(ang);
+  const rot = p => ({ x: (p.x - cx) * cosA + (p.y - cy) * sinA, y: -(p.x - cx) * sinA + (p.y - cy) * cosA });
+  const unrot = p => ({ x: p.x * cosA - p.y * sinA + cx, y: p.x * sinA + p.y * cosA + cy });
+  const rp = polyM.map(rot);
+  let rMinX = Infinity, rMaxX = -Infinity, rMinY = Infinity, rMaxY = -Infinity;
+  rp.forEach(p => { rMinX = Math.min(rMinX, p.x); rMaxX = Math.max(rMaxX, p.x); rMinY = Math.min(rMinY, p.y); rMaxY = Math.max(rMaxY, p.y); });
+  rMinX -= buf; rMaxX += buf; rMinY -= buf; rMaxY += buf;
+
+  const MAX_WPS = 10000;
+  const wps = [];
+  if (lSpc < 0.01 || pSpc < 0.01) { alert('Spacing too small — increase altitude or reduce overlap.'); return; }
+  const nLines = Math.ceil((rMaxX - rMinX) / lSpc) + 1;
+  const nPts = Math.ceil((rMaxY - rMinY) / pSpc) + 1;
+  if (nLines * nPts > MAX_WPS * 5) { alert('Too many potential waypoints (' + (nLines * nPts) + '). Increase altitude or reduce area.'); return; }
+  let aborted = false;
+  for (let ln = 0; ln < nLines && !aborted; ln++) {
+    const rx = rMinX + ln * lSpc;
+    const fwd = ln % 2 === 0;
+    const lineWPs = [];
+    for (let p = 0; p < nPts; p++) {
+      const ry = fwd ? rMinY + p * pSpc : rMaxY - p * pSpc;
+      const local = unrot({ x: rx, y: ry });
+      if (pip(local.x, local.y, polyM)) {
+        const geo = m2ll(ref, local.x, local.y);
+        lineWPs.push({ lat: geo.lat, lng: geo.lng, lx: local.x, ly: local.y, line: ln + 1, alt_ft });
+      }
+    }
+    if (lineWPs.length >= 2) wps.push(...lineWPs);
+    if (wps.length > MAX_WPS) { alert('Waypoint limit reached (' + MAX_WPS + '). Increase altitude or reduce area.'); aborted = true; }
+  }
+
+  let dist = 0;
+  for (let i = 1; i < wps.length; i++) dist += Math.sqrt((wps[i].lx - wps[i-1].lx)**2 + (wps[i].ly - wps[i-1].ly)**2);
+
+  flightPlan = {
+    wps, fpW, fpH, gsd, gsd_in: gsd / 2.54, pSpc, lSpc, dist,
+    time: dist / speed / 60, interval: pSpc / speed,
+    lines: new Set(wps.map(w => w.line)).size, alt_ft, area: polyArea(siteCoords),
+  };
+  showResults();
+  drawGrid();
+}
+
+// ===== ORBIT PLAN =====
+function placeOrbitCenter(latlng) {
+  orbitCenter = { lat: latlng.lat, lng: latlng.lng };
+  if (orbitCenterMarker) map.removeLayer(orbitCenterMarker);
+  if (orbitRadiusCircle) map.removeLayer(orbitRadiusCircle);
+  const icon = L.divIcon({
+    className: '',
+    html: '<div style="width:16px;height:16px;border-radius:50%;background:var(--red,#ff5252);border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.5)"></div>',
+    iconSize: [16, 16], iconAnchor: [8, 8],
+  });
+  orbitCenterMarker = L.marker(latlng, { icon, draggable: true, zIndexOffset: 900 }).addTo(map);
+  orbitCenterMarker.on('drag', (e) => {
+    const ll = e.target.getLatLng();
+    orbitCenter = { lat: ll.lat, lng: ll.lng };
+    debounceRegen();
+  });
+
+  document.getElementById('clearBtn').style.display = '';
+  generateOrbitPlan();
+}
+
+function generateOrbitPlan() {
+  if (!orbitCenter) return;
+  const alt_ft = +document.getElementById('orbitAlt').value;
+  const speed = +document.getElementById('orbitSpeed').value;
+  const radiusFt = +document.getElementById('orbitRadius').value;
+  const stops = +document.getElementById('orbitStops').value;
+  const gimbal = +document.getElementById('orbitGimbal').value;
+  const passes = +document.getElementById('orbitPasses').value;
+  const radiusM = radiusFt * 0.3048;
+  const ref = orbitCenter;
+
+  const wps = [];
+  for (let p = 0; p < passes; p++) {
+    // Each pass at a different altitude: base, base-30%, base-60%
+    const passAlt = alt_ft * (1 - p * 0.3);
+    for (let i = 0; i < stops; i++) {
+      const angle = (2 * Math.PI * i) / stops;
+      const dx = radiusM * Math.sin(angle);
+      const dy = radiusM * Math.cos(angle);
+      const geo = m2ll(ref, dx, dy);
+      // Heading: point toward center. Angle from wp to center.
+      let heading = toDeg(Math.atan2(-dx, -dy));
+      if (heading < 0) heading += 360;
+      wps.push({ lat: geo.lat, lng: geo.lng, lx: dx, ly: dy, alt_ft: Math.round(passAlt), heading: Math.round(heading), gimbal, line: p + 1 });
+    }
+  }
+
+  // Close each loop back to start
+  let dist = 0;
+  for (let i = 1; i < wps.length; i++) dist += Math.sqrt((wps[i].lx - wps[i-1].lx)**2 + (wps[i].ly - wps[i-1].ly)**2);
+  const circumference = 2 * Math.PI * radiusM;
+  const interval = (circumference / stops) / speed;
+
+  flightPlan = {
+    wps, dist, time: dist / speed / 60, interval,
+    lines: passes, alt_ft, area: 0, mode: 'orbit',
+    radiusFt, stops, gimbal, passes,
+  };
+  showResults();
+  drawGrid();
+  // Draw radius circle
+  if (orbitRadiusCircle) map.removeLayer(orbitRadiusCircle);
+  orbitRadiusCircle = L.circle([orbitCenter.lat, orbitCenter.lng], {
+    radius: radiusM, color: '#4d9fff', weight: 1.5, dashArray: '6 4',
+    fillColor: '#4d9fff', fillOpacity: 0.03,
+  }).addTo(gridLayer);
+}
+
+// ===== PERIMETER PLAN =====
+function generatePerimPlan() {
+  if (siteCoords.length < 3) return;
+  const alt_ft = +document.getElementById('perimAlt').value;
+  const speed = +document.getElementById('perimSpeed').value;
+  const offsetFt = +document.getElementById('perimOffset').value;
+  const spacingFt = +document.getElementById('perimSpacing').value;
+  const gimbal = +document.getElementById('perimGimbal').value;
+  const dir = document.getElementById('perimDir').value;
+  const offsetM = offsetFt * 0.3048;
+  const spacingM = spacingFt * 0.3048;
+  const ref = siteCoords[0];
+  const polyM = siteCoords.map(c => ll2m(ref, c));
+
+  // Compute centroid
+  let cx = 0, cy = 0;
+  polyM.forEach(p => { cx += p.x; cy += p.y; });
+  cx /= polyM.length; cy /= polyM.length;
+
+  // For each edge, offset outward (or inward) and place waypoints along it
+  const wps = [];
+  const n = polyM.length;
+  for (let i = 0; i < n; i++) {
+    const a = polyM[i], b = polyM[(i + 1) % n];
+    const edgeDx = b.x - a.x, edgeDy = b.y - a.y;
+    const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+    if (edgeLen < 1) continue;
+    // Normal pointing outward from centroid
+    let nx = -edgeDy / edgeLen, ny = edgeDx / edgeLen;
+    const midX = (a.x + b.x) / 2, midY = (a.y + b.y) / 2;
+    const toCenterX = cx - midX, toCenterY = cy - midY;
+    const dot = nx * toCenterX + ny * toCenterY;
+    if (dir === 'outward') {
+      // Fly outside, look in: normal should point away from center
+      if (dot > 0) { nx = -nx; ny = -ny; }
+    } else {
+      // Fly inside, look out: normal should point toward center
+      if (dot < 0) { nx = -nx; ny = -ny; }
+    }
+    // Heading: camera looks opposite to offset direction (toward the edge)
+    let heading = toDeg(Math.atan2(-nx, -ny));
+    if (heading < 0) heading += 360;
+    // Place points along edge at spacing intervals
+    const nPts = Math.max(2, Math.ceil(edgeLen / spacingM) + 1);
+    for (let j = 0; j < nPts; j++) {
+      const t = j / (nPts - 1);
+      const px = a.x + edgeDx * t + nx * offsetM;
+      const py = a.y + edgeDy * t + ny * offsetM;
+      const geo = m2ll(ref, px, py);
+      wps.push({ lat: geo.lat, lng: geo.lng, lx: px, ly: py, alt_ft, heading: Math.round(heading), gimbal, line: i + 1 });
+    }
+  }
+
+  let dist = 0;
+  for (let i = 1; i < wps.length; i++) dist += Math.sqrt((wps[i].lx - wps[i-1].lx)**2 + (wps[i].ly - wps[i-1].ly)**2);
+
+  flightPlan = {
+    wps, dist, time: dist / speed / 60, interval: spacingM / speed,
+    lines: n, alt_ft, area: polyArea(siteCoords), mode: 'perim',
+    gimbal,
+  };
+  showResults();
+  drawGrid();
+}
+
+function showResults() {
+  const p = flightPlan;
+  document.getElementById('resultsSection').style.display = '';
+  let s;
+  if (p.mode === 'orbit') {
+    s = [
+      { l: 'Photos', v: p.wps.length, u: '' },
+      { l: 'Passes', v: p.passes, u: '' },
+      { l: 'Radius', v: p.radiusFt, u: 'ft' },
+      { l: 'Time', v: p.time.toFixed(1), u: 'min' },
+      { l: 'Interval', v: p.interval.toFixed(1), u: 'sec' },
+      { l: 'Gimbal', v: p.gimbal, u: '°' },
+    ];
+  } else if (p.mode === 'perim') {
+    s = [
+      { l: 'Photos', v: p.wps.length, u: '' },
+      { l: 'Edges', v: p.lines, u: '' },
+      { l: 'Time', v: p.time.toFixed(1), u: 'min' },
+      { l: 'Interval', v: p.interval.toFixed(1), u: 'sec' },
+      { l: 'Distance', v: (p.dist * 3.28084).toFixed(0), u: 'ft' },
+      { l: 'Gimbal', v: p.gimbal, u: '°' },
+    ];
+  } else {
+    s = [
+      { l: 'GSD', v: p.gsd_in.toFixed(2), u: 'in/px' },
+      { l: 'Photos', v: p.wps.length, u: '' },
+      { l: 'Lines', v: p.lines, u: '' },
+      { l: 'Time', v: p.time.toFixed(1), u: 'min' },
+      { l: 'Interval', v: p.interval.toFixed(1), u: 'sec' },
+      { l: 'Distance', v: (p.dist * 3.28084).toFixed(0), u: 'ft' },
+    ];
+  }
+  document.getElementById('statsGrid').innerHTML = s.map(x =>
+    `<div class="stat-card"><div class="stat-label">${x.l}</div><div class="stat-val">${x.v}<span class="u">${x.u}</span></div></div>`
+  ).join('');
+  let w = '';
+  if (p.time > 25) w += `<div class="warn">${Math.ceil(p.time / 25)} batteries needed (~${p.time.toFixed(0)} min)</div>`;
+  if (p.interval < 2) w += `<div class="warn">Interval ${p.interval.toFixed(1)}s too fast. Increase altitude or reduce speed.</div>`;
+  if (p.wps.length > 2000) w += `<div class="warn">${p.wps.length} waypoints — may exceed DJI limit. Increase altitude.</div>`;
+  document.getElementById('warnBox').innerHTML = w;
+  if (!p.mode || p.mode === 'ortho') updateGsdAdvisory(p);
+  else document.getElementById('gsdAdvisory').style.display = 'none';
+}
+
+function updateGsdStandalone() {
+  const alt_ft = +document.getElementById('altitude').value;
+  const cam = CAM[+document.getElementById('photoMode').value];
+  const alt_m = alt_ft * 0.3048;
+  const gsd_in = (cam.sw * alt_m * 100) / (cam.f * cam.iw) / 2.54;
+  updateGsdAdvisory({ alt_ft, gsd_in });
+}
+
+function updateGsdAdvisory(p) {
+  const box = document.getElementById('gsdAdvisory');
+  const targetIn = +document.getElementById('targetGSD').value;
+  if (!targetIn || targetIn <= 0) { box.style.display = 'none'; return; }
+  const cam = CAM[+document.getElementById('photoMode').value];
+  const targetCm = targetIn * 2.54;
+  const idealAltM = (targetCm * cam.f * cam.iw) / (cam.sw * 100);
+  const idealAltFt = Math.round(idealAltM / 0.3048);
+  const delta = p.alt_ft - idealAltFt;
+  const actualIn = p.gsd_in;
+  box.style.display = '';
+  if (Math.abs(delta) <= 10) {
+    box.style.background = 'rgba(61,220,132,0.08)';
+    box.style.border = '1px solid rgba(61,220,132,0.25)';
+    box.style.color = 'var(--green)';
+    box.textContent = 'Ideal altitude for ' + targetIn + '" GSD: ' + idealAltFt + ' ft \u2014 you\'re on target';
+  } else {
+    const dir = delta > 0 ? 'higher' : 'lower';
+    const color = Math.abs(delta) > 50 ? 'var(--red)' : 'var(--orange)';
+    box.style.background = delta > 0 ? 'rgba(255,171,64,0.08)' : 'rgba(77,159,255,0.08)';
+    box.style.border = `1px solid ${delta > 0 ? 'rgba(255,171,64,0.25)' : 'rgba(77,159,255,0.25)'}`;
+    box.style.color = color;
+    box.textContent = 'Ideal: ' + idealAltFt + ' ft for ' + targetIn + '" GSD \u00B7 You\'re ' + Math.abs(delta) + ' ft ' + dir + ' \u2192 actual ' + actualIn.toFixed(2) + '"/px';
+  }
+}
+
+function drawGrid() {
+  gridLayer.clearLayers();
+  wpLayer.clearLayers();
+  if (!flightPlan || !flightPlan.wps.length) return;
+  const wps = flightPlan.wps;
+  const isOblique = flightPlan.mode === 'orbit' || flightPlan.mode === 'perim';
+  // Flight path
+  L.polyline(wps.map(w => [w.lat, w.lng]), { color: isOblique ? '#e040fb' : '#ffab40', weight: 1.5, opacity: 0.7 }).addTo(gridLayer);
+  // Waypoints
+  wps.forEach((w, i) => {
+    const c = i === 0 ? '#3ddc84' : i === wps.length - 1 ? '#ff5252' : (isOblique ? '#e040fb' : '#ffab40');
+    L.circleMarker([w.lat, w.lng], {
+      radius: (i === 0 || i === wps.length - 1) ? 5 : (isOblique ? 3 : 1.5),
+      color: c, fillColor: c, fillOpacity: 0.9, weight: 0,
+    }).addTo(wpLayer);
+    // Direction indicator for oblique modes
+    if (isOblique && w.heading != null) {
+      const len = 8;
+      const hRad = toRad(w.heading);
+      const tip = m2ll(w, Math.sin(hRad) * len, Math.cos(hRad) * len);
+      L.polyline([[w.lat, w.lng], [tip.lat, tip.lng]], {
+        color: c, weight: 1, opacity: 0.5,
+      }).addTo(wpLayer);
+    }
+  });
+}
+
+// ===== EXPORTS =====
+function exportDJIKMZ() {
+  if (!flightPlan) return;
+  const wps = flightPlan.wps, spd = +document.getElementById('speed').value;
+  const am = parseFloat((wps[0].alt_ft * 0.3048).toFixed(2));
+  const ts = Date.now();
+
+  // template.kml — minimal stub. DJI Fly ignores this for consumer drones.
+  const templateKml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.2">
+  <Document>
+    <wpml:author>fly</wpml:author>
+    <wpml:createTime>${ts}</wpml:createTime>
+    <wpml:updateTime>${ts}</wpml:updateTime>
+    <wpml:missionConfig>
+      <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>
+      <wpml:finishAction>goHome</wpml:finishAction>
+      <wpml:exitOnRCLost>executeLostAction</wpml:exitOnRCLost>
+      <wpml:executeRCLostAction>goBack</wpml:executeRCLostAction>
+      <wpml:globalTransitionalSpeed>${spd}</wpml:globalTransitionalSpeed>
+      <wpml:droneInfo>
+        <wpml:droneEnumValue>68</wpml:droneEnumValue>
+        <wpml:droneSubEnumValue>0</wpml:droneSubEnumValue>
+      </wpml:droneInfo>
+    </wpml:missionConfig>
+  </Document>
+</kml>`;
+
+  // waylines.wpml — the actual mission file DJI Fly reads
+  let wpml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.2">
+  <Document>
+    <wpml:author>fly</wpml:author>
+    <wpml:createTime>${ts}</wpml:createTime>
+    <wpml:updateTime>${ts}</wpml:updateTime>
+    <wpml:missionConfig>
+      <wpml:flyToWaylineMode>safely</wpml:flyToWaylineMode>
+      <wpml:finishAction>goHome</wpml:finishAction>
+      <wpml:exitOnRCLost>executeLostAction</wpml:exitOnRCLost>
+      <wpml:executeRCLostAction>goBack</wpml:executeRCLostAction>
+      <wpml:globalTransitionalSpeed>${spd}</wpml:globalTransitionalSpeed>
+      <wpml:droneInfo>
+        <wpml:droneEnumValue>68</wpml:droneEnumValue>
+        <wpml:droneSubEnumValue>0</wpml:droneSubEnumValue>
+      </wpml:droneInfo>
+    </wpml:missionConfig>
+    <Folder>
+      <wpml:templateId>0</wpml:templateId>
+      <wpml:executeHeightMode>relativeToStartPoint</wpml:executeHeightMode>
+      <wpml:waylineId>0</wpml:waylineId>
+      <wpml:autoFlightSpeed>${spd}</wpml:autoFlightSpeed>
+      <wpml:transitionalSpeed>${spd}</wpml:transitionalSpeed>
+`;
+
+  wps.forEach((w, i) => {
+    wpml += `      <Placemark>
+        <Point>
+          <coordinates>${w.lng.toFixed(8)},${w.lat.toFixed(8)}</coordinates>
+        </Point>
+        <wpml:index>${i}</wpml:index>
+        <wpml:executeHeight>${parseFloat((w.alt_ft * 0.3048).toFixed(2))}</wpml:executeHeight>
+        <wpml:waypointSpeed>${spd}</wpml:waypointSpeed>
+        <wpml:waypointHeadingParam>
+          <wpml:waypointHeadingMode>${w.heading != null ? 'manually' : 'followWayline'}</wpml:waypointHeadingMode>
+          <wpml:waypointHeadingAngle>${w.heading != null ? w.heading : 0}</wpml:waypointHeadingAngle>
+          <wpml:waypointHeadingAngleEnable>${w.heading != null ? 1 : 0}</wpml:waypointHeadingAngleEnable>
+          <wpml:waypointHeadingPathMode>followBadArc</wpml:waypointHeadingPathMode>
+        </wpml:waypointHeadingParam>
+        <wpml:waypointTurnParam>
+          <wpml:waypointTurnMode>toPointAndPassWithContinuityCurvature</wpml:waypointTurnMode>
+          <wpml:waypointTurnDampingDist>0.2</wpml:waypointTurnDampingDist>
+        </wpml:waypointTurnParam>
+        <wpml:useStraightLine>1</wpml:useStraightLine>
+        <wpml:actionGroup>
+          <wpml:actionGroupId>${i * 2}</wpml:actionGroupId>
+          <wpml:actionGroupStartIndex>${i}</wpml:actionGroupStartIndex>
+          <wpml:actionGroupEndIndex>${i}</wpml:actionGroupEndIndex>
+          <wpml:actionGroupMode>sequence</wpml:actionGroupMode>
+          <wpml:actionTrigger>
+            <wpml:actionTriggerType>reachPoint</wpml:actionTriggerType>
+          </wpml:actionTrigger>
+          <wpml:action>
+            <wpml:actionId>0</wpml:actionId>
+            <wpml:actionActuatorFunc>gimbalRotate</wpml:actionActuatorFunc>
+            <wpml:actionActuatorFuncParam>
+              <wpml:gimbalRotateMode>absoluteAngle</wpml:gimbalRotateMode>
+              <wpml:gimbalPitchRotateAngle>${w.gimbal != null ? w.gimbal : -90}</wpml:gimbalPitchRotateAngle>
+              <wpml:gimbalRollRotateAngle>0</wpml:gimbalRollRotateAngle>
+              <wpml:gimbalYawRotateAngle>0</wpml:gimbalYawRotateAngle>
+              <wpml:gimbalRotateTimeEnable>0</wpml:gimbalRotateTimeEnable>
+              <wpml:gimbalRotateTimeInSeconds>0</wpml:gimbalRotateTimeInSeconds>
+              <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
+            </wpml:actionActuatorFuncParam>
+          </wpml:action>
+          <wpml:action>
+            <wpml:actionId>1</wpml:actionId>
+            <wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc>
+            <wpml:actionActuatorFuncParam>
+              <wpml:payloadPositionIndex>0</wpml:payloadPositionIndex>
+            </wpml:actionActuatorFuncParam>
+          </wpml:action>
+          <wpml:action>
+            <wpml:actionId>2</wpml:actionId>
+            <wpml:actionActuatorFunc>hover</wpml:actionActuatorFunc>
+            <wpml:actionActuatorFuncParam>
+              <wpml:hoverTime>0</wpml:hoverTime>
+            </wpml:actionActuatorFuncParam>
+          </wpml:action>
+        </wpml:actionGroup>
+      </Placemark>
+`;
+  });
+
+  wpml += `    </Folder>
+  </Document>
+</kml>`;
+
+  const zip = new JSZip();
+  const wpmz = zip.folder('wpmz');
+  wpmz.file('template.kml', templateKml);
+  wpmz.file('waylines.wpml', wpml);
+  zip.generateAsync({ type: 'blob' }).then(blob => {
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = 'mini4pro_mission.kmz';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  });
+}
+
+function exportCSV() {
+  if (!flightPlan) return;
+  let c = 'WP,Lat,Lng,Alt_ft,Alt_m,Line\n';
+  flightPlan.wps.forEach((w, i) => { c += `${i+1},${w.lat.toFixed(8)},${w.lng.toFixed(8)},${w.alt_ft},${(w.alt_ft*0.3048).toFixed(1)},${w.line}\n`; });
+  dl(c, 'mini4pro_waypoints.csv', 'text/csv');
+}
+function exportKML() {
+  if (!flightPlan) return;
+  const wps = flightPlan.wps, am = (wps[0].alt_ft*0.3048).toFixed(1);
+  let k = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Flight</name><Style id="f"><LineStyle><color>ff00aaff</color><width>2</width></LineStyle></Style><Placemark><name>Path</name><styleUrl>#f</styleUrl><LineString><altitudeMode>relativeToGround</altitudeMode><coordinates>\n`;
+  k += wps.map(w => `${w.lng.toFixed(8)},${w.lat.toFixed(8)},${am}`).join('\n');
+  k += '\n</coordinates></LineString></Placemark></Document></kml>';
+  dl(k, 'mini4pro_flight.kml', 'application/vnd.google-earth.kml+xml');
+}
+function exportLitchiCSV() {
+  if (!flightPlan) return;
+  const wps = flightPlan.wps, am = (wps[0].alt_ft*0.3048).toFixed(1), sp = +document.getElementById('speed').value;
+  let c = 'latitude,longitude,altitude(m),heading(deg),curvesize(m),rotationdir(cw),gimbalmode,gimbalpitchangle,actiontype1,actionparam1,actiontype2,actionparam2,actiontype3,actionparam3,altitudemode,speed(m/s),poi_latitude,poi_longitude,poi_altitude(m),poi_altitudemode,photo_timeinterval,photo_distinterval\n';
+  wps.forEach(w => { c += `${w.lat.toFixed(8)},${w.lng.toFixed(8)},${am},0,0,0,2,-90,1,0,-1,0,-1,0,1,${sp},0,0,0,0,${flightPlan.interval.toFixed(1)},-1\n`; });
+  dl(c, 'mini4pro_litchi.csv', 'text/csv');
+}
+function dl(content, filename, type) {
+  const b = new Blob([content], { type }); const a = document.createElement('a');
+  const url = URL.createObjectURL(b); a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// ===== ADDRESS SEARCH (Nominatim) =====
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('searchInput');
+  const results = document.getElementById('searchResults');
+
+  input.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = input.value.trim();
+    if (q.length < 3) { results.innerHTML = ''; return; }
+    searchTimer = setTimeout(() => searchAddress(q), 400);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { results.innerHTML = ''; input.blur(); }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const first = results.querySelector('.search-result');
+      if (first) first.click();
+    }
+  });
+
+  // Close results on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrap')) results.innerHTML = '';
+  });
+});
+
+async function searchAddress(q) {
+  const results = document.getElementById('searchResults');
+  try {
+    // Get map center for proximity bias
+    const mc = map.getCenter();
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=8&addressdetails=1&viewbox=${mc.lng-0.5},${mc.lat+0.5},${mc.lng+0.5},${mc.lat-0.5}&bounded=0&q=${encodeURIComponent(q)}`, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'Mini4ProFlightPlanner/1.0 (https://github.com/trimblelink/flight-planner)' }
+    });
+    const data = await r.json();
+    if (!data.length) { results.innerHTML = ''; const noRes = document.createElement('div'); noRes.className = 'search-result'; noRes.textContent = 'No results'; results.appendChild(noRes); return; }
+    results.innerHTML = '';
+    data.forEach((d) => {
+      const parts = String(d.display_name || '').split(',');
+      const lat = Number(parseFloat(d.lat)) || 0;
+      const lng = Number(parseFloat(d.lon)) || 0;
+      if (!isFinite(lat) || !isFinite(lng)) return;
+      const el = document.createElement('div');
+      el.className = 'search-result';
+      const strong = document.createElement('strong');
+      strong.textContent = parts[0] || '';
+      el.appendChild(strong);
+      el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(parts.slice(1, 3).join(',')));
+      el.addEventListener('click', () => {
+        map.flyTo([lat, lng], 17, { duration: 1.5 });
+        results.innerHTML = '';
+        document.getElementById('searchInput').value = strong.textContent;
+      });
+      results.appendChild(el);
+    });
+  } catch (e) { results.innerHTML = ''; const err = document.createElement('div'); err.className = 'search-result'; err.textContent = 'Search failed'; results.appendChild(err); }
+}
+
+// ===== GEOLOCATION =====
+function goToMyLocation() {
+  if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      map.flyTo([lat, lng], 17, { duration: 1.5 });
+      if (locationMarker) map.removeLayer(locationMarker);
+      locationMarker = L.circleMarker([lat, lng], {
+        radius: 8, color: '#4d9fff', fillColor: '#4d9fff', fillOpacity: 0.3, weight: 2,
+      }).addTo(map).bindPopup('You are here').openPopup();
+      setTimeout(() => { if (locationMarker) map.removeLayer(locationMarker); locationMarker = null; }, 8000);
+    },
+    (err) => { alert('Location error: ' + err.message); },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// ===== MAP LAYER TOGGLE =====
+function toggleMapLayer() {
+  const btn = document.getElementById('layerToggle');
+  if (isSatellite) {
+    map.removeLayer(satLayer);
+    map.removeLayer(labelLayer);
+    streetLayer.addTo(map);
+    btn.classList.add('active');
+    btn.title = 'Switch to satellite';
+  } else {
+    map.removeLayer(streetLayer);
+    satLayer.addTo(map);
+    labelLayer.addTo(map);
+    btn.classList.remove('active');
+    btn.title = 'Switch to street map';
+  }
+  isSatellite = !isSatellite;
+}
+
+// ===== FIT TO AREA =====
+function fitToArea() {
+  if (siteCoords.length < 3) return;
+  map.fitBounds(L.latLngBounds(siteCoords.map(c => [c.lat, c.lng])).pad(0.3));
+}
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown', (e) => {
+  // Don't fire in inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  switch (e.key) {
+    case 'Escape': if (drawMode) cancelDraw(); break;
+    case 'Delete': if (siteCoords.length && !drawMode) clearAll(); break;
+    case 'd': case 'D': if (!drawMode) startDraw(); break;
+    case 'l': case 'L': goToMyLocation(); break;
+    case 'f': case 'F': fitToArea(); break;
+    case 'm': case 'M': toggleMapLayer(); break;
+    case '=': case '+': map.zoomIn(); break;
+    case '-': map.zoomOut(); break;
+  }
+});
+</script>
+</body>
+</html>
