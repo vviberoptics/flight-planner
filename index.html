@@ -119,6 +119,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .leaflet-control-zoom a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--border)!important}
 .leaflet-popup-content-wrapper{background:var(--panel);color:var(--text);border-radius:8px;font-family:'DM Sans',sans-serif}
 .leaflet-popup-tip{background:var(--panel)}
+
+/* SIDEBAR TOGGLE BUTTON (mobile) */
+.sidebar-toggle{display:none;position:absolute;bottom:80px;right:12px;z-index:600;width:44px;height:44px;border-radius:50%;background:var(--accent);border:none;color:#fff;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.4);align-items:center;justify-content:center;transition:transform 0.2s}
+.sidebar-toggle svg{width:22px;height:22px}
+.sidebar-toggle.open{transform:rotate(180deg)}
+
+/* MOBILE RESPONSIVE */
+@media(max-width:768px){
+  .toolbar{padding:8px 10px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .toolbar .logo span{display:none}
+  .tool-btn{padding:5px 10px;font-size:11px;white-space:nowrap}
+  .sidebar-toggle{display:flex}
+  .side{position:fixed;top:0;right:0;bottom:0;width:min(320px,85vw);transform:translateX(100%);transition:transform 0.25s ease;z-index:1100;box-shadow:-4px 0 20px rgba(0,0,0,0.5)}
+  .side.visible{transform:translateX(0)}
+  .side-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1050}
+  .side-overlay.visible{display:block}
+  /* Hide search bar when sidebar is open */
+  .search-wrap.sidebar-open{display:none}
+  .map-btns-right{right:12px;top:12px}
+  .map-chip{font-size:10px;padding:4px 8px}
+  .search-wrap input{width:220px;font-size:12px;padding:8px 10px 8px 30px}
+}
 </style>
 </head>
 <body>
@@ -182,8 +204,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div class="coord-bar" id="coordBar">--</div>
 
 
+  <!-- SIDEBAR TOGGLE (mobile) -->
+  <div class="side-overlay" id="sideOverlay" onclick="toggleSidebar()"></div>
+  <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle settings panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
   <!-- SIDE PANEL -->
-  <div class="side">
+  <div class="side" id="sidePanel">
     <!-- MISSION MODE -->
     <div class="section" style="padding-bottom:10px">
       <div class="section-title blue">Mission Mode</div>
@@ -318,6 +346,16 @@ let polyMarkers = []; // draggable vertex markers
 let rotHandle = null;
 let rotLine = null;
 let autoGenTimer = null;
+let sidebarOpen = false;
+
+// ===== SIDEBAR TOGGLE (mobile) =====
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidePanel').classList.toggle('visible', sidebarOpen);
+  document.getElementById('sideOverlay').classList.toggle('visible', sidebarOpen);
+  document.getElementById('sidebarToggle').classList.toggle('open', sidebarOpen);
+  document.querySelector('.search-wrap').classList.toggle('sidebar-open', sidebarOpen);
+}
 
 // ===== MAP INIT =====
 document.addEventListener('DOMContentLoaded', () => {
