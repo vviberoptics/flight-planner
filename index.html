@@ -125,8 +125,27 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .sidebar-toggle svg{width:22px;height:22px}
 .sidebar-toggle.open{transform:rotate(180deg)}
 
+/* MOBILE EXPORT FAB */
+.export-fab{display:none;position:absolute;bottom:140px;right:12px;z-index:600;width:48px;height:48px;border-radius:50%;background:var(--green);border:none;color:#111;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.4);align-items:center;justify-content:center;transition:transform 0.2s}
+.export-fab svg{width:24px;height:24px}
+
+/* EXPORT BOTTOM SHEET */
+.export-sheet-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200}
+.export-sheet-overlay.visible{display:block}
+.export-sheet{position:fixed;bottom:0;left:0;right:0;background:var(--panel);border-radius:16px 16px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));z-index:1250;transform:translateY(100%);transition:transform 0.25s ease}
+.export-sheet.visible{transform:translateY(0)}
+.export-sheet .sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.export-sheet .sheet-title{font-size:14px;font-weight:700;margin-bottom:12px}
+.export-sheet .sheet-btn{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;margin-bottom:8px;transition:background 0.15s;-webkit-tap-highlight-color:transparent}
+.export-sheet .sheet-btn:active{background:rgba(77,159,255,0.1)}
+.export-sheet .sheet-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.export-sheet .sheet-btn .sheet-btn-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.export-sheet .sheet-btn.primary .sheet-btn-sub{color:rgba(255,255,255,0.7)}
+.export-sheet .sheet-cancel{display:block;width:100%;padding:14px;border-radius:10px;border:none;background:var(--border);color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:600;cursor:pointer;margin-top:4px;-webkit-tap-highlight-color:transparent}
+
 /* MOBILE RESPONSIVE */
 @media(max-width:768px){
+  .export-fab.has-plan{display:flex}
   .toolbar{padding:8px 10px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .toolbar .logo span{display:none}
   .tool-btn{padding:5px 10px;font-size:11px;white-space:nowrap}
@@ -158,6 +177,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     Upload KML
   </button>
   <input type="file" id="fileIn" accept=".kml,.kmz" style="display:none">
+  <button class="tool-btn" id="obstacleBtn" onclick="startObstacle()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 9v4m0 4h.01M3 12l9-9 9 9"/>
+      <path d="M3 12h18"/>
+    </svg>
+    Obstacle
+  </button>
   <button class="tool-btn" id="clearBtn" onclick="clearAll()" style="display:none">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     Clear
@@ -210,6 +236,28 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
   </button>
 
+  <!-- MOBILE EXPORT FAB -->
+  <button class="export-fab" id="exportFab" onclick="openExportSheet()" title="Export flight plan">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
+
+  <!-- EXPORT BOTTOM SHEET (mobile) -->
+  <div class="export-sheet-overlay" id="exportSheetOverlay" onclick="closeExportSheet()"></div>
+  <div class="export-sheet" id="exportSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Export Flight Plan</div>
+    <button class="sheet-btn primary" onclick="mobileExport('kmz')">
+      <div><div>DJI Fly KMZ</div><div class="sheet-btn-sub">Mission file for DJI Fly app</div></div>
+    </button>
+    <button class="sheet-btn" onclick="mobileExport('csv')">
+      <div><div>CSV Waypoints</div><div class="sheet-btn-sub">Spreadsheet-compatible waypoint list</div></div>
+    </button>
+    <button class="sheet-btn" onclick="mobileExport('kml')">
+      <div><div>KML Flight Path</div><div class="sheet-btn-sub">Google Earth compatible path</div></div>
+    </button>
+    <button class="sheet-cancel" onclick="closeExportSheet()">Cancel</button>
+  </div>
+
   <!-- SIDE PANEL -->
   <div class="side" id="sidePanel">
     <!-- MISSION MODE -->
@@ -217,6 +265,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <div class="section-title blue">Mission Mode</div>
       <div style="display:flex;gap:4px">
         <button class="tool-btn active" id="modeOrtho" onclick="setMode('ortho')" style="flex:1;justify-content:center">Ortho</button>
+        <button class="tool-btn" id="modeCorridor" onclick="setMode('corridor')" style="flex:1;justify-content:center">Corridor</button>
         <button class="tool-btn" id="modeOrbit" onclick="setMode('orbit')" style="flex:1;justify-content:center">Orbit</button>
         <button class="tool-btn" id="modePerim" onclick="setMode('perim')" style="flex:1;justify-content:center">Perimeter</button>
       </div>
@@ -289,6 +338,46 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         <select id="perimDir"><option value="outward" selected>Look inward (fly outside)</option><option value="inward">Look outward (fly inside)</option></select>
       </div>
       <div style="font-size:10px;color:var(--dim);margin-top:6px">Draw a polygon around the site. Drone flies offset from the edges, camera aimed inward.</div>
+    </div>
+
+    <!-- CORRIDOR PARAMS -->
+    <div class="section" id="corridorParams" style="display:none">
+      <div class="section-title blue">Corridor Parameters</div>
+      <div class="row">
+        <div class="field"><label>Altitude (ft AGL)</label>
+          <input type="number" id="corrAlt" value="200" min="30" max="400" step="10"></div>
+        <div class="field"><label>Speed (m/s)</label>
+          <input type="number" id="corrSpeed" value="5" min="1" max="12" step="0.5"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Passes</label>
+          <select id="corrPasses">
+            <option value="1">1 (centerline)</option>
+            <option value="2" selected>2 (both sides)</option>
+            <option value="3">3 (center + sides)</option>
+            <option value="5">5</option>
+          </select>
+        </div>
+        <div class="field"><label>Photo Mode</label>
+          <select id="corrPhotoMode">
+            <option value="12" selected>12 MP</option>
+            <option value="48">48 MP</option>
+          </select>
+        </div>
+      </div>
+      <div class="slider-field">
+        <div class="slider-head"><label>Front Overlap</label><span id="corrFOV">80%</span></div>
+        <input type="range" id="corrFrontOL" min="50" max="90" value="80">
+      </div>
+      <div class="slider-field">
+        <div class="slider-head"><label>Side Overlap</label><span id="corrSOV">60%</span></div>
+        <input type="range" id="corrSideOL" min="30" max="80" value="60">
+      </div>
+      <div style="font-size:10px;color:var(--dim);margin-top:6px">
+        Draw a polygon along the corridor. The centerline is extracted<br>
+        automatically from the polygon shape — follows all curves.<br>
+        Passes run parallel to the centerline.
+      </div>
     </div>
 
     <!-- RESULTS -->
@@ -432,6 +521,18 @@ document.addEventListener('DOMContentLoaded', () => {
     debounceRegen();
   });
 
+  // Corridor param listeners
+  ['corrAlt','corrSpeed','corrPasses','corrPhotoMode'].forEach(id => {
+    document.getElementById(id).addEventListener('change', debounceRegen);
+  });
+  ['corrFrontOL','corrSideOL'].forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      document.getElementById(id === 'corrFrontOL' ? 'corrFOV' : 'corrSOV').textContent = el.value + '%';
+      debounceRegen();
+    });
+  });
+
   // File upload
   document.getElementById('fileIn').addEventListener('change', e => {
     if (e.target.files.length) handleFile(e.target.files[0]);
@@ -442,6 +543,7 @@ function debounceRegen() {
   clearTimeout(autoGenTimer);
   autoGenTimer = setTimeout(() => {
     if (missionMode === 'orbit' && orbitCenter) generateOrbitPlan();
+    else if (missionMode === 'corridor' && siteCoords.length >= 3) generateCorridorPlan();
     else if (siteCoords.length >= 3) generatePlan();
   }, 200);
 }
@@ -449,9 +551,11 @@ function debounceRegen() {
 function setMode(mode) {
   missionMode = mode;
   document.getElementById('modeOrtho').classList.toggle('active', mode === 'ortho');
+  document.getElementById('modeCorridor').classList.toggle('active', mode === 'corridor');
   document.getElementById('modeOrbit').classList.toggle('active', mode === 'orbit');
   document.getElementById('modePerim').classList.toggle('active', mode === 'perim');
   document.getElementById('orthoParams').style.display = mode === 'ortho' ? '' : 'none';
+  document.getElementById('corridorParams').style.display = mode === 'corridor' ? '' : 'none';
   document.getElementById('orbitParams').style.display = mode === 'orbit' ? '' : 'none';
   document.getElementById('perimParams').style.display = mode === 'perim' ? '' : 'none';
   // Update draw button label
@@ -474,6 +578,7 @@ function setMode(mode) {
   handleLayer.clearLayers();
   polyMarkers.forEach(m => map.removeLayer(m)); polyMarkers = [];
   document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('exportFab').classList.remove('has-plan');
   document.getElementById('clearBtn').style.display = 'none';
   document.getElementById('areaChip').style.display = 'none';
   // Auto-start draw for the new mode
@@ -503,6 +608,7 @@ function cancelDraw() {
 }
 
 function onMapClick(e) {
+  if (obstacleMode) { placeObstacle(e.latlng); return; }
   if (!drawMode) return;
   // Orbit mode: single click to place center
   if (missionMode === 'orbit') {
@@ -706,12 +812,14 @@ function clearAll() {
   orbitCenter = null;
   if (orbitCenterMarker) { map.removeLayer(orbitCenterMarker); orbitCenterMarker = null; }
   if (orbitRadiusCircle) { map.removeLayer(orbitRadiusCircle); orbitRadiusCircle = null; }
+  obstacles.forEach(o => { map.removeLayer(o.marker); map.removeLayer(o.circle); }); obstacles = [];
   polyLayer.clearLayers();
   gridLayer.clearLayers();
   wpLayer.clearLayers();
   handleLayer.clearLayers();
   polyMarkers.forEach(m => map.removeLayer(m)); polyMarkers = [];
   document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('exportFab').classList.remove('has-plan');
   document.getElementById('clearBtn').style.display = 'none';
   document.getElementById('areaChip').style.display = 'none';
 }
@@ -740,6 +848,7 @@ function pip(px, py, poly) {
 function generatePlan() {
   if (missionMode === 'orbit') { if (orbitCenter) generateOrbitPlan(); return; }
   if (missionMode === 'perim') { if (siteCoords.length >= 3) generatePerimPlan(); return; }
+  if (missionMode === 'corridor') { if (siteCoords.length >= 3) generateCorridorPlan(); return; }
   if (siteCoords.length < 3) return;
   const alt_ft = +document.getElementById('altitude').value;
   const speed = +document.getElementById('speed').value;
@@ -767,14 +876,33 @@ function generatePlan() {
   rp.forEach(p => { rMinX = Math.min(rMinX, p.x); rMaxX = Math.max(rMaxX, p.x); rMinY = Math.min(rMinY, p.y); rMaxY = Math.max(rMaxY, p.y); });
   rMinX -= buf; rMaxX += buf; rMinY -= buf; rMaxY += buf;
 
-  const MAX_WPS = 10000;
+  const MAX_WPS = 1999;
   const wps = [];
   if (lSpc < 0.01 || pSpc < 0.01) { alert('Spacing too small — increase altitude or reduce overlap.'); return; }
   const nLines = Math.ceil((rMaxX - rMinX) / lSpc) + 1;
   const nPts = Math.ceil((rMaxY - rMinY) / pSpc) + 1;
-  if (nLines * nPts > MAX_WPS * 5) { alert('Too many potential waypoints (' + (nLines * nPts) + '). Increase altitude or reduce area.'); return; }
-  let aborted = false;
-  for (let ln = 0; ln < nLines && !aborted; ln++) {
+  const estTotal = nLines * nPts;
+  if (estTotal > 50000) {
+    flightPlan = null;
+    gridLayer.clearLayers();
+    wpLayer.clearLayers();
+    document.getElementById('resultsSection').style.display = '';
+    document.getElementById('statsGrid').innerHTML = `
+      <div class="stat-card" style="grid-column:1/-1">
+        <div class="stat-label">Too Many Waypoints</div>
+        <div class="stat-val" style="font-size:14px;color:var(--red)">
+          ~${estTotal.toLocaleString()} estimated
+        </div>
+      </div>`;
+    document.getElementById('warnBox').innerHTML = `
+      <div class="warn">Area too large for current settings. Try:
+        <br>• Increase altitude (currently ${alt_ft} ft)
+        <br>• Reduce overlap
+        <br>• Use Corridor mode for linear sites
+      </div>`;
+    return;
+  }
+  for (let ln = 0; ln < nLines; ln++) {
     const rx = rMinX + ln * lSpc;
     const fwd = ln % 2 === 0;
     const lineWPs = [];
@@ -787,8 +915,9 @@ function generatePlan() {
       }
     }
     if (lineWPs.length >= 2) wps.push(...lineWPs);
-    if (wps.length > MAX_WPS) { alert('Waypoint limit reached (' + MAX_WPS + '). Increase altitude or reduce area.'); aborted = true; }
   }
+
+  applyObstacles(wps, ref);
 
   let dist = 0;
   for (let i = 1; i < wps.length; i++) dist += Math.sqrt((wps[i].lx - wps[i-1].lx)**2 + (wps[i].ly - wps[i-1].ly)**2);
@@ -939,6 +1068,7 @@ function generatePerimPlan() {
 function showResults() {
   const p = flightPlan;
   document.getElementById('resultsSection').style.display = '';
+  document.getElementById('exportFab').classList.add('has-plan');
   let s;
   if (p.mode === 'orbit') {
     s = [
@@ -948,6 +1078,15 @@ function showResults() {
       { l: 'Time', v: p.time.toFixed(1), u: 'min' },
       { l: 'Interval', v: p.interval.toFixed(1), u: 'sec' },
       { l: 'Gimbal', v: p.gimbal, u: '°' },
+    ];
+  } else if (p.mode === 'corridor') {
+    s = [
+      { l: 'GSD', v: p.gsd_in.toFixed(2), u: 'in/px' },
+      { l: 'Photos', v: p.wps.length, u: '' },
+      { l: 'Passes', v: p.lines, u: '' },
+      { l: 'Time', v: p.time.toFixed(1), u: 'min' },
+      { l: 'Interval', v: p.interval.toFixed(1), u: 'sec' },
+      { l: 'Distance', v: (p.dist * 3.28084).toFixed(0), u: 'ft' },
     ];
   } else if (p.mode === 'perim') {
     s = [
@@ -974,7 +1113,10 @@ function showResults() {
   let w = '';
   if (p.time > 25) w += `<div class="warn">${Math.ceil(p.time / 25)} batteries needed (~${p.time.toFixed(0)} min)</div>`;
   if (p.interval < 2) w += `<div class="warn">Interval ${p.interval.toFixed(1)}s too fast. Increase altitude or reduce speed.</div>`;
-  if (p.wps.length > 2000) w += `<div class="warn">${p.wps.length} waypoints — may exceed DJI limit. Increase altitude.</div>`;
+  if (p.wps.length > 1999) {
+    const n = Math.ceil(p.wps.length / 1999);
+    w += `<div class="warn">${p.wps.length} waypoints → exports as ${n} mission files</div>`;
+  }
   document.getElementById('warnBox').innerHTML = w;
   if (!p.mode || p.mode === 'ortho') updateGsdAdvisory(p);
   else document.getElementById('gsdAdvisory').style.display = 'none';
@@ -1044,12 +1186,17 @@ function drawGrid() {
 // ===== EXPORTS =====
 function exportDJIKMZ() {
   if (!flightPlan) return;
-  const wps = flightPlan.wps, spd = +document.getElementById('speed').value;
-  const am = parseFloat((wps[0].alt_ft * 0.3048).toFixed(2));
+  const allWps = flightPlan.wps;
+  const spd = +document.getElementById(missionMode === 'corridor' ? 'corrSpeed' : 'speed').value;
   const ts = Date.now();
+  const MAX_WPS = 1999;
+  const numMissions = Math.ceil(allWps.length / MAX_WPS);
 
-  // template.kml — minimal stub. DJI Fly ignores this for consumer drones.
-  const templateKml = `<?xml version="1.0" encoding="UTF-8"?>
+  for (let m = 0; m < numMissions; m++) {
+    const wps = allWps.slice(m * MAX_WPS, (m + 1) * MAX_WPS);
+    const suffix = numMissions > 1 ? `_part${m + 1}of${numMissions}` : '';
+
+    const templateKml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.2">
   <Document>
     <wpml:author>fly</wpml:author>
@@ -1069,8 +1216,7 @@ function exportDJIKMZ() {
   </Document>
 </kml>`;
 
-  // waylines.wpml — the actual mission file DJI Fly reads
-  let wpml = `<?xml version="1.0" encoding="UTF-8"?>
+    let wpml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:wpml="http://www.dji.com/wpmz/1.0.2">
   <Document>
     <wpml:author>fly</wpml:author>
@@ -1095,8 +1241,8 @@ function exportDJIKMZ() {
       <wpml:transitionalSpeed>${spd}</wpml:transitionalSpeed>
 `;
 
-  wps.forEach((w, i) => {
-    wpml += `      <Placemark>
+    wps.forEach((w, i) => {
+      wpml += `      <Placemark>
         <Point>
           <coordinates>${w.lng.toFixed(8)},${w.lat.toFixed(8)}</coordinates>
         </Point>
@@ -1152,24 +1298,20 @@ function exportDJIKMZ() {
         </wpml:actionGroup>
       </Placemark>
 `;
-  });
+    });
 
-  wpml += `    </Folder>
+    wpml += `    </Folder>
   </Document>
 </kml>`;
 
-  const zip = new JSZip();
-  const wpmz = zip.folder('wpmz');
-  wpmz.file('template.kml', templateKml);
-  wpmz.file('waylines.wpml', wpml);
-  zip.generateAsync({ type: 'blob' }).then(blob => {
-    const a = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    a.href = url;
-    a.download = 'mini4pro_mission.kmz';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  });
+    const zip = new JSZip();
+    const wpmz = zip.folder('wpmz');
+    wpmz.file('template.kml', templateKml);
+    wpmz.file('waylines.wpml', wpml);
+    zip.generateAsync({ type: 'blob' }).then(blob => {
+      dlBlob(blob, `mini4pro_mission${suffix}.kmz`);
+    });
+  }
 }
 
 function exportCSV() {
@@ -1194,9 +1336,50 @@ function exportLitchiCSV() {
   dl(c, 'mini4pro_litchi.csv', 'text/csv');
 }
 function dl(content, filename, type) {
-  const b = new Blob([content], { type }); const a = document.createElement('a');
-  const url = URL.createObjectURL(b); a.href = url; a.download = filename; a.click();
+  const b = new Blob([content], { type });
+  // Try Web Share API (works reliably on mobile for saving to Files/Downloads)
+  if (navigator.canShare && navigator.canShare({ files: [new File([b], filename, { type })] })) {
+    const file = new File([b], filename, { type });
+    navigator.share({ files: [file], title: filename }).catch(() => {
+      // User cancelled share — fall back to download link
+      dlFallback(b, filename);
+    });
+  } else {
+    dlFallback(b, filename);
+  }
+}
+function dlBlob(blob, filename) {
+  // Same as dl but accepts a blob directly
+  if (navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: blob.type })] })) {
+    const file = new File([blob], filename, { type: blob.type });
+    navigator.share({ files: [file], title: filename }).catch(() => {
+      dlFallback(blob, filename);
+    });
+  } else {
+    dlFallback(blob, filename);
+  }
+}
+function dlFallback(blob, filename) {
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// ===== MOBILE EXPORT SHEET =====
+function openExportSheet() {
+  document.getElementById('exportSheetOverlay').classList.add('visible');
+  document.getElementById('exportSheet').classList.add('visible');
+}
+function closeExportSheet() {
+  document.getElementById('exportSheetOverlay').classList.remove('visible');
+  document.getElementById('exportSheet').classList.remove('visible');
+}
+function mobileExport(format) {
+  closeExportSheet();
+  if (format === 'kmz') exportDJIKMZ();
+  else if (format === 'csv') exportCSV();
+  else if (format === 'kml') exportKML();
 }
 
 // ===== ADDRESS SEARCH (Nominatim) =====
@@ -1300,6 +1483,232 @@ function toggleMapLayer() {
 function fitToArea() {
   if (siteCoords.length < 3) return;
   map.fitBounds(L.latLngBounds(siteCoords.map(c => [c.lat, c.lng])).pad(0.3));
+}
+
+// ===== CORRIDOR PLAN =====
+function generateCorridorPlan() {
+  if (siteCoords.length < 3) return;
+
+  const alt_ft = +document.getElementById('corrAlt').value;
+  const speed = +document.getElementById('corrSpeed').value;
+  const fOL = +document.getElementById('corrFrontOL').value;
+  const sOL = +document.getElementById('corrSideOL').value;
+  const nPasses = +document.getElementById('corrPasses').value;
+  const cam = CAM[+document.getElementById('corrPhotoMode').value];
+  const alt_m = alt_ft * 0.3048;
+
+  const fpW = cam.sw * alt_m / cam.f;
+  const fpH = cam.sh * alt_m / cam.f;
+  const gsd = (cam.sw * alt_m * 100) / (cam.f * cam.iw);
+  const pSpc = fpH * (1 - fOL / 100);
+  const passSpc = fpW * (1 - sOL / 100);
+
+  const ref = siteCoords[0];
+  const pts = siteCoords.map(c => ll2m(ref, c));
+
+  // Step 1: Find two farthest vertices (corridor endpoints)
+  let maxDist = 0, iA = 0, iB = 0;
+  for (let i = 0; i < pts.length; i++) {
+    for (let j = i + 1; j < pts.length; j++) {
+      const d = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+      if (d > maxDist) { maxDist = d; iA = i; iB = j; }
+    }
+  }
+
+  // Step 2: Split polygon into two sides
+  const n = pts.length;
+  const sideA = [];
+  const sideB = [];
+  for (let i = iA; ; i = (i + 1) % n) {
+    sideA.push(pts[i]);
+    if (i === iB) break;
+  }
+  for (let i = iB; ; i = (i + 1) % n) {
+    sideB.push(pts[i]);
+    if (i === iA) break;
+  }
+
+  // Step 3: Resample both sides and compute centerline
+  function resamplePolyline(line, numPts) {
+    let totalLen = 0;
+    for (let i = 1; i < line.length; i++)
+      totalLen += Math.hypot(line[i].x - line[i-1].x, line[i].y - line[i-1].y);
+    if (totalLen === 0 || numPts < 2) return line.slice(0, numPts);
+    const step = totalLen / (numPts - 1);
+    const result = [{ x: line[0].x, y: line[0].y }];
+    let acc = 0, si = 0;
+    for (let p = 1; p < numPts; p++) {
+      const target = p * step;
+      while (si < line.length - 2) {
+        const segLen = Math.hypot(line[si+1].x - line[si].x, line[si+1].y - line[si].y);
+        if (acc + segLen >= target) {
+          const t = (target - acc) / segLen;
+          result.push({
+            x: line[si].x + t * (line[si+1].x - line[si].x),
+            y: line[si].y + t * (line[si+1].y - line[si].y),
+          });
+          break;
+        }
+        acc += segLen;
+        si++;
+      }
+    }
+    while (result.length < numPts) result.push({ x: line[line.length-1].x, y: line[line.length-1].y });
+    return result;
+  }
+
+  const nSamples = Math.max(30, Math.ceil(maxDist / pSpc) + 1);
+  const sampA = resamplePolyline(sideA, nSamples);
+  const sampB = resamplePolyline(sideB, nSamples).reverse();
+
+  const centerline = sampA.map((a, i) => ({
+    x: (a.x + sampB[i].x) / 2,
+    y: (a.y + sampB[i].y) / 2,
+  }));
+
+  // Step 4: Compute perpendicular direction at each centerline point
+  function perpAt(cl, i) {
+    const prev = Math.max(0, i - 1);
+    const next = Math.min(cl.length - 1, i + 1);
+    const dx = cl[next].x - cl[prev].x;
+    const dy = cl[next].y - cl[prev].y;
+    const len = Math.hypot(dx, dy) || 1;
+    return { x: -dy / len, y: dx / len };
+  }
+
+  // Step 5: Generate pass offsets
+  const offsets = [];
+  if (nPasses === 1) {
+    offsets.push(0);
+  } else {
+    const totalW = (nPasses - 1) * passSpc;
+    for (let p = 0; p < nPasses; p++)
+      offsets.push(-totalW / 2 + p * passSpc);
+  }
+
+  // Step 6: Generate waypoints
+  const wps = [];
+  let clLen = 0;
+  for (let i = 1; i < centerline.length; i++)
+    clLen += Math.hypot(centerline[i].x - centerline[i-1].x, centerline[i].y - centerline[i-1].y);
+  const nPhotos = Math.ceil(clLen / pSpc) + 1;
+  const clResampled = resamplePolyline(centerline, nPhotos);
+
+  offsets.forEach((offset, passIdx) => {
+    const lineNum = passIdx + 1;
+    const passWPs = [];
+    for (let i = 0; i < clResampled.length; i++) {
+      const clIdx = Math.round(i * (centerline.length - 1) / Math.max(1, clResampled.length - 1));
+      const perp = perpAt(centerline, clIdx);
+      const wx = clResampled[i].x + perp.x * offset;
+      const wy = clResampled[i].y + perp.y * offset;
+      const geo = m2ll(ref, wx, wy);
+      passWPs.push({ lat: geo.lat, lng: geo.lng, lx: wx, ly: wy, line: lineNum, alt_ft });
+    }
+    if (passIdx % 2 === 1) passWPs.reverse();
+    wps.push(...passWPs);
+  });
+
+  applyObstacles(wps, ref);
+
+  let dist = 0;
+  for (let i = 1; i < wps.length; i++)
+    dist += Math.hypot(wps[i].lx - wps[i-1].lx, wps[i].ly - wps[i-1].ly);
+
+  flightPlan = {
+    wps, fpW, fpH, gsd, gsd_in: gsd / 2.54, pSpc, lSpc: passSpc, dist,
+    time: dist / speed / 60, interval: pSpc / speed,
+    lines: nPasses, alt_ft, area: polyArea(siteCoords), mode: 'corridor',
+  };
+  showResults();
+  drawGrid();
+}
+
+// ===== OBSTACLE AVOIDANCE =====
+let obstacles = [];
+let obstacleMode = false;
+
+function startObstacle() {
+  obstacleMode = !obstacleMode;
+  document.getElementById('obstacleBtn').classList.toggle('active', obstacleMode);
+  map.getContainer().style.cursor = obstacleMode ? 'crosshair' : '';
+}
+
+function placeObstacle(latlng) {
+  const height = prompt('Obstacle height above ground (ft):', '100');
+  if (!height) return;
+  const h = parseFloat(height);
+  if (isNaN(h) || h <= 0) return;
+
+  const radius = 50;
+  const clearance = 50;
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:20px;height:20px;background:var(--red);border:2px solid #fff;
+      border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:9px;color:#fff;font-weight:700;font-family:DM Mono,monospace;
+    ">!</div>`,
+    iconSize: [20, 20], iconAnchor: [10, 10],
+  });
+
+  const marker = L.marker(latlng, { icon, draggable: true }).addTo(map);
+  marker.bindTooltip(`Tower: ${h}ft + ${clearance}ft clearance`, {
+    className: 'angle-tooltip', direction: 'top', offset: [0, -14]
+  });
+
+  const circle = L.circle(latlng, {
+    radius: radius * 0.3048,
+    color: '#ff5252', fillColor: '#ff5252', fillOpacity: 0.1, weight: 1, dashArray: '4 4',
+  }).addTo(map);
+
+  const obs = { lat: latlng.lat, lng: latlng.lng, height_ft: h, radius_ft: radius, clearance_ft: clearance, marker, circle };
+  obstacles.push(obs);
+
+  marker.on('drag', (e) => {
+    obs.lat = e.latlng.lat;
+    obs.lng = e.latlng.lng;
+    circle.setLatLng(e.latlng);
+    debounceRegen();
+  });
+
+  obstacleMode = false;
+  document.getElementById('obstacleBtn').classList.remove('active');
+  map.getContainer().style.cursor = '';
+  debounceRegen();
+}
+
+function applyObstacles(wps, ref) {
+  if (obstacles.length === 0) return;
+  for (const obs of obstacles) {
+    const obsM = ll2m(ref, { lat: obs.lat, lng: obs.lng });
+    const radiusM = obs.radius_ft * 0.3048;
+    const obsAltFt = obs.height_ft + obs.clearance_ft;
+
+    for (const wp of wps) {
+      const d = Math.hypot(wp.lx - obsM.x, wp.ly - obsM.y);
+      if (d < radiusM) {
+        wp.alt_ft = Math.max(wp.alt_ft, obsAltFt);
+      }
+    }
+  }
+
+  // Smooth transitions
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 1; i < wps.length - 1; i++) {
+      if (wps[i].line === wps[i-1].line) {
+        const diff = Math.abs(wps[i].alt_ft - wps[i-1].alt_ft);
+        const maxStep = 30;
+        if (diff > maxStep) {
+          if (wps[i].alt_ft > wps[i-1].alt_ft)
+            wps[i-1].alt_ft = Math.max(wps[i-1].alt_ft, wps[i].alt_ft - maxStep);
+          else
+            wps[i].alt_ft = Math.max(wps[i].alt_ft, wps[i-1].alt_ft - maxStep);
+        }
+      }
+    }
+  }
 }
 
 // ===== KEYBOARD SHORTCUTS =====
