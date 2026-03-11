@@ -1,6 +1,6 @@
 # Drone Flight Planner
 
-**[Open the Planner](https://hfakes1.github.io/flight-planner/)**
+**[Open the Planner](https://vviberoptics.github.io/flight-planner/)**
 
 Single-file browser tool for planning DJI Mini 4 Pro mapping missions. No install, no server, no account — just open and plan.
 
