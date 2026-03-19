@@ -4073,10 +4073,10 @@ window.UI = (function () {
       ortho: document.getElementById('orthoParams'),
       corridor: document.getElementById('corridorParams'),
       orbit: document.getElementById('orbitParams'),
-      perim: document.getElementById('perimParams'),
+      perimeter: document.getElementById('perimParams'),
     };
     Object.entries(panels).forEach(([key, el]) => {
-      if (el) el.style.display = key === mode ? '' : 'none';
+      if (el) el.classList.toggle('visible', key === mode);
     });
 
     const drawBtn = document.getElementById('btnDrawArea');
@@ -4917,7 +4917,11 @@ window.UI = (function () {
    Bridge: plan:regen -> Planner.generate()
    ======================================================================= */
 Bus.on('plan:regen', function() {
-  try { Planner.generate(); } catch(e) { console.error('[plan:regen]', e); }
+  try {
+    Planner.generate();
+  } catch(e) {
+    console.error('[plan:regen] Error:', e);
+  }
 });
 
 </script>
