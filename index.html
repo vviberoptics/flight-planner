@@ -149,7 +149,12 @@ a:hover { text-decoration: underline; }
   flex-shrink: 0;
   z-index: 900;
   position: relative;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.toolbar::-webkit-scrollbar { display: none; }
 
 .toolbar-brand {
   display: flex;
@@ -1378,10 +1383,16 @@ input[type=file] {
 
   .sidebar-close-btn { display: flex; }
   .drag-handle       { display: none; }
+  .btn-label { display: none; }
 
   .search-wrap {
     max-width: calc(100vw - 48px);
   }
+}
+
+/* ─── Narrow desktop (1025-1280) ───────────────────────────────────────────── */
+@media (min-width: 1025px) and (max-width: 1280px) {
+  .btn-label { display: none; }
 }
 
 /* ─── Tablet (481-768) ──────────────────────────────────────────────────────── */
