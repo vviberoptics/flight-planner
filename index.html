@@ -1927,7 +1927,7 @@ select:focus:not(:focus-visible) {
               </div>
               <div class="stat-card" role="listitem">
                 <div class="stat-val" id="statDist">—</div>
-                <div class="stat-label">Distance (mi)</div>
+                <div class="stat-label">Distance (ft)</div>
               </div>
               <div class="stat-card" role="listitem">
                 <div class="stat-val orange" id="statTime">—</div>
@@ -2854,7 +2854,7 @@ window.Exporter = (function () {
 
       // Action 1: takePhoto / startRecord / hover based on wp.action
       var actionId = 1;
-      if (action === 'photo') {
+      if (action === 'takePhoto') {
         lines.push('          <wpml:action>');
         lines.push('            <wpml:actionId>' + actionId + '</wpml:actionId>');
         lines.push('            <wpml:actionActuatorFunc>takePhoto</wpml:actionActuatorFunc>');
@@ -3009,12 +3009,12 @@ window.Exporter = (function () {
   // ---------------------------------------------------------------------------
 
   function djiKmz(plan, speed) {
-    if (!plan || !plan.waypoints || plan.waypoints.length === 0) {
+    if (!plan || !plan.wps || plan.wps.length === 0) {
       console.warn('Exporter.djiKmz: no waypoints in plan');
       return;
     }
 
-    var wps = plan.waypoints;
+    var wps = plan.wps;
     var ts = Date.now();
     var spd = speed || 5;
 
@@ -3049,13 +3049,13 @@ window.Exporter = (function () {
   }
 
   function csv(plan) {
-    if (!plan || !plan.waypoints || plan.waypoints.length === 0) {
+    if (!plan || !plan.wps || plan.wps.length === 0) {
       console.warn('Exporter.csv: no waypoints in plan');
       return;
     }
 
     var rows = ['WP,Lat,Lng,Alt_ft,Alt_m,Heading,Gimbal,Line'];
-    plan.waypoints.forEach(function (wp, i) {
+    plan.wps.forEach(function (wp, i) {
       var altM = (wp.alt_ft * FT2M).toFixed(2);
       var heading = (wp.heading != null) ? wp.heading : '';
       var gimbal = (wp.gimbal != null) ? wp.gimbal : -90;
@@ -3067,12 +3067,12 @@ window.Exporter = (function () {
   }
 
   function kml(plan) {
-    if (!plan || !plan.waypoints || plan.waypoints.length === 0) {
+    if (!plan || !plan.wps || plan.wps.length === 0) {
       console.warn('Exporter.kml: no waypoints in plan');
       return;
     }
 
-    var coords = plan.waypoints.map(function (wp) {
+    var coords = plan.wps.map(function (wp) {
       return wp.lng.toFixed(7) + ',' + wp.lat.toFixed(7) + ',' + (wp.alt_ft * FT2M).toFixed(2);
     }).join(' ');
 
@@ -3096,12 +3096,12 @@ window.Exporter = (function () {
   }
 
   function geoJson(plan) {
-    if (!plan || !plan.waypoints || plan.waypoints.length === 0) {
+    if (!plan || !plan.wps || plan.wps.length === 0) {
       console.warn('Exporter.geoJson: no waypoints in plan');
       return;
     }
 
-    var wps = plan.waypoints;
+    var wps = plan.wps;
 
     var lineCoords = wps.map(function (wp) {
       return [wp.lng, wp.lat, parseFloat((wp.alt_ft * FT2M).toFixed(2))];
@@ -3166,6 +3166,7 @@ window.AltChart = (function () {
   var _chart = null;
 
   function update(plan) {
+    if (typeof Chart === 'undefined') return;
     var canvas = document.getElementById('altitudeProfile');
     if (!canvas) return;
 
@@ -3176,7 +3177,7 @@ window.AltChart = (function () {
     }
 
     // Clear canvas and bail if no plan data
-    if (!plan || !plan.waypoints || plan.waypoints.length === 0) {
+    if (!plan || !plan.wps || plan.wps.length === 0) {
       var ctx2d = canvas.getContext('2d');
       ctx2d.clearRect(0, 0, canvas.width, canvas.height);
       return;
@@ -3190,8 +3191,8 @@ window.AltChart = (function () {
     gradient.addColorStop(0, 'rgba(77, 159, 255, 0.45)');
     gradient.addColorStop(1, 'rgba(77, 159, 255, 0.02)');
 
-    var labels = plan.waypoints.map(function (wp, i) { return i; });
-    var data = plan.waypoints.map(function (wp) { return wp.alt_ft; });
+    var labels = plan.wps.map(function (wp, i) { return i; });
+    var data = plan.wps.map(function (wp) { return wp.alt_ft; });
 
     _chart = new Chart(ctx, {
       type: 'line',
@@ -3330,7 +3331,7 @@ window.Search = (function () {
 
     if (!data || data.length === 0) {
       var empty = document.createElement('div');
-      empty.className = 'search-result-item search-result-empty';
+      empty.className = 'search-result search-result-empty';
       empty.textContent = 'No results found';
       resultsEl.appendChild(empty);
       resultsEl.style.display = 'block';
@@ -3339,7 +3340,7 @@ window.Search = (function () {
 
     data.forEach(function (item) {
       var el = document.createElement('div');
-      el.className = 'search-result-item';
+      el.className = 'search-result';
       el.textContent = item.display_name;
       el.dataset.lat = item.lat;
       el.dataset.lng = item.lon;
@@ -3827,9 +3828,6 @@ window.MapCtrl = (function () {
     map.on('dblclick', _onMapDblClick);
 
     // Bus listeners
-    Bus.on('plan:generated', (plan) => {
-      if (plan) drawPlan(plan);
-    });
   }
 
   function _onMapClick(e) {
@@ -3942,7 +3940,6 @@ window.MapCtrl = (function () {
     createRotationHandle();
     fitBounds();
     updateAreaChip();
-    Bus.emit('state:siteCoords', coords);
     Bus.emit('plan:regen');
   }
 
@@ -4233,9 +4230,9 @@ window.UI = (function () {
 
     const el = document.createElement('div');
     el.style.cssText = [
-      'background:var(--panel)',
+      'background:var(--bg-2)',
       'border:1px solid ' + color,
-      'color:var(--text)',
+      'color:var(--text-primary)',
       'border-radius:8px',
       'padding:10px 16px',
       'font-size:13px',
@@ -4555,6 +4552,7 @@ window.UI = (function () {
     header.addEventListener('click', () => {
       const expanded = body.style.display !== 'none';
       body.style.display = expanded ? 'none' : '';
+      header.setAttribute('aria-expanded', expanded ? 'false' : 'true');
     });
   }
 
@@ -4563,10 +4561,12 @@ window.UI = (function () {
   function _toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
+    const overlay = document.getElementById('sidebarOverlay');
     if (window.innerWidth >= 1025) {
       sidebar.classList.toggle('collapsed');
     } else {
       sidebar.classList.toggle('open');
+      if (overlay) overlay.classList.toggle('visible');
     }
   }
 
@@ -4575,6 +4575,8 @@ window.UI = (function () {
     if (closeBtn) closeBtn.addEventListener('click', _toggleSidebar);
     const fab = document.getElementById('btnToggleSidebar');
     if (fab) fab.addEventListener('click', _toggleSidebar);
+    const overlay = document.getElementById('sidebarOverlay');
+    if (overlay) overlay.addEventListener('click', _toggleSidebar);
   }
 
   // ---- slider live updates ----
@@ -4633,7 +4635,15 @@ window.UI = (function () {
 
   function _wireExports() {
     const exportMap = {
-      exportKmz: () => { if (typeof Exporter !== 'undefined') Exporter.djiKmz(AppState.get('flightPlan')); },
+      exportKmz: () => {
+        if (typeof Exporter === 'undefined') return;
+        var plan = AppState.get('flightPlan');
+        var mode = AppState.get('mode') || 'ortho';
+        var ids = {ortho:'orthoSpeed',corridor:'corrSpeed',orbit:'orbitSpeed',perimeter:'perimSpeed'};
+        var el = document.getElementById(ids[mode] || 'orthoSpeed');
+        var speed = el ? parseFloat(el.value) || 8 : 8;
+        Exporter.djiKmz(plan, speed);
+      },
       exportCsv: () => { if (typeof Exporter !== 'undefined') Exporter.csv(AppState.get('flightPlan')); },
       exportKml: () => { if (typeof Exporter !== 'undefined') Exporter.kml(AppState.get('flightPlan')); },
       exportGeoJson: () => { if (typeof Exporter !== 'undefined') Exporter.geoJson(AppState.get('flightPlan')); },
@@ -4680,10 +4690,6 @@ window.UI = (function () {
   // ---- bus listeners ----
 
   function _wireBus() {
-    Bus.on('state:flightPlan', (plan) => {
-      updateResults(plan);
-    });
-
     Bus.on('state:siteCoords', (coords) => {
       if (!coords || coords.length < 3) {
         const chip = document.getElementById('areaChip');
@@ -4761,6 +4767,35 @@ window.UI = (function () {
       });
     }
 
+    // Map float buttons
+    var mapZoomIn = document.getElementById('mapZoomIn');
+    if (mapZoomIn) mapZoomIn.addEventListener('click', function(){ MapCtrl.getMap().zoomIn(); });
+    var mapZoomOut = document.getElementById('mapZoomOut');
+    if (mapZoomOut) mapZoomOut.addEventListener('click', function(){ MapCtrl.getMap().zoomOut(); });
+    var mapFit = document.getElementById('mapFit');
+    if (mapFit) mapFit.addEventListener('click', function(){ MapCtrl.fitBounds(); });
+    var mapLocate = document.getElementById('mapLocate');
+    if (mapLocate) mapLocate.addEventListener('click', function(){ Search.locate(); });
+
+    // Search clear button
+    var searchInput = document.getElementById('searchInput');
+    var searchClearBtn = document.getElementById('searchClearBtn');
+    if (searchInput && searchClearBtn) {
+      searchInput.addEventListener('input', function() {
+        if (searchInput.value.length > 0) {
+          searchClearBtn.classList.add('visible');
+        } else {
+          searchClearBtn.classList.remove('visible');
+        }
+      });
+      searchClearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        searchClearBtn.classList.remove('visible');
+        var resultsList = document.getElementById('searchResultsList');
+        if (resultsList) { resultsList.innerHTML = ''; resultsList.style.display = 'none'; }
+      });
+    }
+
     _wireSliders();
     _wireParams();
     _wireExports();
@@ -4772,6 +4807,12 @@ window.UI = (function () {
     // Drop zones
     _wireDrop('srtDropZone', (files) => { if (files.length) handleSrtUpload(files[0]); });
     _wireDrop('photoDropZone', (files) => { if (files.length) handlePhotoUpload(files); });
+
+    // Drop zone click-to-browse
+    var srtZone = document.getElementById('srtDropZone');
+    if (srtZone) srtZone.addEventListener('click', function(){ document.getElementById('fileInSrt').click(); });
+    var photoZone = document.getElementById('photoDropZone');
+    if (photoZone) photoZone.addEventListener('click', function(){ document.getElementById('fileInPhotos').click(); });
 
     // Mosaic export button
     const exportMosaic = document.getElementById('exportMosaic');
