@@ -382,7 +382,7 @@ a:hover { text-decoration: underline; }
 /* ─── Map Overlays ──────────────────────────────────────────────────────────── */
 .map-overlay {
   position: absolute;
-  z-index: 400;
+  z-index: 1000;
   pointer-events: auto;
 }
 
@@ -624,6 +624,7 @@ a:hover { text-decoration: underline; }
   z-index: 500;
   transition: transform var(--transition-slow), width var(--transition-slow);
 }
+.sidebar.collapsed { width: 0; border-left: none; }
 
 .sidebar-header {
   padding: 0 16px;
@@ -650,7 +651,6 @@ a:hover { text-decoration: underline; }
   justify-content: center;
   color: var(--text-muted);
   transition: background var(--transition-fast), color var(--transition-fast);
-  display: none;
 }
 
 .sidebar-close-btn:hover { background: var(--bg-3); color: var(--text-primary); }
@@ -1359,7 +1359,6 @@ input[type=file] {
 
 /* ─── Desktop (>=1025) ──────────────────────────────────────────────────────── */
 @media (min-width: 1025px) {
-  .sidebar-close-btn { display: none; }
   .drag-handle       { display: none; }
   #map.sidebar-push  { margin-right: var(--sidebar-w); }
 }
@@ -4561,21 +4560,21 @@ window.UI = (function () {
 
   // ---- sidebar open/close ----
 
+  function _toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    if (window.innerWidth >= 1025) {
+      sidebar.classList.toggle('collapsed');
+    } else {
+      sidebar.classList.toggle('open');
+    }
+  }
+
   function _wireSidebar() {
     const closeBtn = document.getElementById('sidebarCloseBtn');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar) sidebar.classList.remove('open');
-      });
-    }
+    if (closeBtn) closeBtn.addEventListener('click', _toggleSidebar);
     const fab = document.getElementById('btnToggleSidebar');
-    if (fab) {
-      fab.addEventListener('click', () => {
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar) sidebar.classList.toggle('open');
-      });
-    }
+    if (fab) fab.addEventListener('click', _toggleSidebar);
   }
 
   // ---- slider live updates ----
